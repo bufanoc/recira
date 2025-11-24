@@ -1,0 +1,37 @@
+<div>
+  <p class="role_spanHeader {{role.xen_type}}">
+    <span dojoAttachPoint="label"></span>
+{% if not is_bottom %}
+    <span dojoAttachPoint="text_desc"></span>
+    <span class="policyViewOthers" dojoAttachPoint="view_others"></span>
+{% endif %}
+  </p>
+
+{% if is_bottom %}
+  <input dojoType="dijit.form.RadioButton" name="rspan_config"
+    dojoAttachPoint="inherit" type="radio"
+    dojoAttachEvent="onClick:onRadioChange"/>
+    {% if is_global %}
+      No global RSPAN policy
+    {% else %}
+      Inherit RSPAN policy from parent
+    {% endif %}
+  <div dojoAttachPoint="off_block">
+    <br />
+    <input dojoType="dijit.form.RadioButton" name="rspan_config"
+      dojoAttachPoint="off" type="radio"
+      dojoAttachEvent="onClick:onRadioChange"/>
+  Disable inherited RSPAN policy
+  </div>
+  <br>
+  <input dojoType="dijit.form.RadioButton" name="rspan_config"
+  dojoAttachPoint="set" type="radio"
+  dojoAttachEvent="onClick:onRadioChange" />
+  RSPAN traffic to target VLAN
+  <input dojoType="dijit.form.FilteringSelect" dojoAttachPoint="set_value" required="true" dojoAttachEvent="onClick:onEdit" />
+  <span class="link vlan_link" style="margin-left:15px">Manage target VLAN list</span>
+  <span class="bad_vlan error_span"></span>
+{% else %}
+  <div class="innerContainer" dojoAttachPoint="inner_div" ></div>
+{% endif %}
+</div>

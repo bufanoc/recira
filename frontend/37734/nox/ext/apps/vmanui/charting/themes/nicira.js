@@ -1,0 +1,3 @@
+/* Copyright (c) 2008, 2009, 2010 Nicira, Inc. */
+
+if(!dojo._hasResource["nox.ext.apps.vmanui.charting.themes.nicira"]){dojo._hasResource["nox.ext.apps.vmanui.charting.themes.nicira"]=true;dojo.provide("nox.ext.apps.vmanui.charting.themes.nicira");(function(){var _1=dojox.charting;nox.ext.apps.vmanui.charting.themes.nicira=new _1.Theme({axis:{font:"normal normal normal 7pt Arial",fontColor:"#000000"},colors:["#A6CE39","#760E12","#6DCFF6","#7D530D","#B2B2B2","#36677B","#ED1C24","#4C4C4C","#FAA61A","#53671C"]});})();}

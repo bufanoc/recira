@@ -1,0 +1,30 @@
+<div> 
+<table width="100%" cellspacing="0" cellpadding="0" class="TableFirewallPolicy">
+    <tr>
+	<td><div dojoAttachPoint="protocol_box"></div></td>
+    <td class="dialogButtonContainer"> 
+      <button class="blueButton" dojoType="dijit.form.Button" 
+        disabled="true" dojoAttachPoint="use_proto_btn"
+        dojoAttachEvent="onClick:onSubmit">
+        Use Protocol 
+      </button>
+      <button dojoType="dijit.form.Button" 
+          dojoAttachPoint="cancel_btn"
+          dojoAttachEvent="onClick:onCancel">
+          Cancel
+        </button>
+    </td>
+    </tr>
+    <tr><td> 
+        <a dojoAttachPoint="view_details_link"> </a>
+    </td>
+	</tr>
+    <tr>
+	</tr>
+  </table> 
+  <span dojoAttachPoint="proto_modify" 
+        dojoAttachEvent="onSave:onProtoSave"
+        dojoType="nox.ext.apps.vmanui.protocol_modify"
+        is_standalone="false"> 
+  </span> {{ empty_str }}
+</div> 

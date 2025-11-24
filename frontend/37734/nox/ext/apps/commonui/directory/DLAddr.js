@@ -1,0 +1,3 @@
+/* Copyright (c) 2008, 2009, 2010 Nicira, Inc. */
+
+if(!dojo._hasResource["nox.ext.apps.commonui.directory.DLAddr"]){dojo._hasResource["nox.ext.apps.commonui.directory.DLAddr"]=true;dojo.provide("nox.ext.apps.commonui.directory.DLAddr");dojo.require("nox.ext.apps.commonui.coreui._UpdatingItem");dojo.declare("nox.ext.apps.commonui.directory.DLAddr",[nox.ext.apps.commonui.coreui._UpdatingItem],{identityAttributes:["mac_str"],labelAttributes:["mac_str"],constructor:function(_1){},isValid:function(){return true;}});}

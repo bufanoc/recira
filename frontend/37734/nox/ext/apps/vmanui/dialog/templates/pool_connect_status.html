@@ -1,0 +1,19 @@
+<div dojoAttachPoint="containerNode" style="width:300px">
+  <div class="pollingDiv">
+    <div>Trying to connect to '{{ master_addr }}'</div> 
+    <div style="text-align:center;margin-top:12px;">
+      <div dojoType="dijit.ProgressBar" style="width:300px" indeterminate="true"></div>
+    </div> 
+    <div class="dialogButtonContainer">
+      <button dojoType="dijit.form.Button" dojoAttachEvent="onClick:onCancel">Cancel </button> 
+    </div> 
+  </div>
+  <div class="stealingDiv">
+    <div style="margin-bottom:15px">This pool is already managed by controller <span class="currentControllerIP"></span>.
+    Would you like to steal control by force or just leave it under the other controller's command?</div>
+    <div style="text-align:right">
+      <button class="blueButton" dojoType="dijit.form.Button" dojoAttachEvent="onClick:stealPool">Steal Control</button>
+      <button dojoType="dijit.form.Button" dojoAttachEvent="onClick:hide">Leave it</button>
+    </div>
+  </div>
+</div>

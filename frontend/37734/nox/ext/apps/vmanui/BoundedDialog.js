@@ -1,0 +1,3 @@
+/* Copyright (c) 2008, 2009, 2010 Nicira, Inc. */
+
+if(!dojo._hasResource["nox.ext.apps.vmanui.BoundedDialog"]){dojo._hasResource["nox.ext.apps.vmanui.BoundedDialog"]=true;dojo.provide("nox.ext.apps.vmanui.BoundedDialog");dojo.require("dijit.Dialog");dojo.declare("nox.ext.apps.vmanui.BoundedDialog",[dijit.Dialog],{_endDrag:function(e){this.inherited(arguments);if(e&&e.node&&e.node===this.domNode){if(this._relativePosition.t<0){this._relativePosition.t=0;dojo.style(e.node,{top:0});}}}});}

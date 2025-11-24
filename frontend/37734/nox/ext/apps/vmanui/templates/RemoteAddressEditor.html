@@ -1,0 +1,69 @@
+<div class="dijitDialog selectRemoteAddressDialog" tabindex="-1" waiState="labelledby-${id}_title">
+  <div dojoAttachPoint="titleBar" class="dijitDialogTitleBar">
+    <span dojoAttachPoint="titleNode" class="dijitDialogTitle" id="${id}_title"></span>
+    <span dojoAttachPoint="closeButtonNode" class="dijitDialogCloseIcon" dojoAttachEvent="onclick: onCancel" title="${buttonCancel}">
+      <span dojoAttachPoint="closeText" class="closeText" title="${buttonCancel}">x</span>
+    </span>
+  </div>
+  <div dojoAttachPoint="containerNode" >
+    <div dojoAttachPoint="layoutContainer" style="height:480px;width:500px" dojoType="dijit.layout.BorderContainer" design="headline" gutters="false">
+      <div dojoType="dijit.layout.BorderContainer" design="sidebar" region="center" class="contentContainer" gutters="false">
+        <div dojoAttachPoint="left" class="sideContainer" region="left" style="height: 381px; width: 200px;" dojoType="dijit.layout.BorderContainer" design="headline" gutters="false">
+          <div dojoType="dijit.layout.ContentPane" region="top" class="tableHeader">
+              Other Address Groups
+          </div>
+          <!-- list goes here -->
+
+          <div dojoType="dijit.layout.ContentPane" minSize=35 region="bottom" class="bottomPane"></div>
+        </div>
+        <div dojoAttachPoint="center" region="center" dojoType="dijit.layout.ContentPane" class="middleButtonContainer">
+          <button dojoType="dijit.form.Button" dojoAttachPoint="addOne" dojoAttachEvent="onClick: onAddOne">&#62;&#62;</button>
+          <br/>
+          <button dojoType="dijit.form.Button" dojoAttachPoint="remOne" dojoAttachEvent="onClick: onRemOne">&#60;&#60;</button>
+          <br/>
+          <hr>
+          <button dojoType="dijit.form.Button" dojoAttachPoint="addAll" dojoAttachEvent="onClick: onAddAll">All &#62;&#62;</button>
+          <br/>
+          <button dojoType="dijit.form.Button" dojoAttachPoint="remAll" dojoAttachEvent="onClick: onRemAll">&#60;&#60; All</button>
+        </div>
+        <div dojoAttachPoint="right" class="sideContainer" region="right" style="height: 381px; width: 200px;" dojoType="dijit.layout.BorderContainer" design="headline" gutters="false">
+          <div dojoType="dijit.layout.ContentPane" region="top" class="tableHeader">
+              Selected Address Groups
+          </div>
+          <!-- list goes here -->
+          <!--
+          <div dojoType="dijit.layout.ContentPane" region="center">
+            <select multiple="true" dojoAttachPoint="allGroups" class="item-list-editor-list"></select>
+          </div>
+          -->
+          <div dojoType="dijit.layout.ContentPane" minSize=35 region="bottom" class="bottomPane">
+            <table width="100%" cellspacing="0" cellpadding="0" style="position:absolute; top: 3px;">
+              <tr>
+                <td width="70%" style="padding-right: 5px;">
+                  <input type="text" dojoType="nox.ext.apps.vmanui.regex.NetworkTextBox" dojoAttachPoint="quickAddText" dojoAttachEvent="onFocus: onQuickAddTextFocus, onBlur: onQuickAddTextBlur" value="${quickAddDefaultText}"/>
+                </td>
+                <td>    
+                  <button dojoType="dijit.form.Button" dojoAttachPoint="quickAddButton" dojoAttachEvent="onClick: onQuickAddClicked" >Add</button>
+                </td> 
+              </tr>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div dojoType="dijit.layout.ContentPane" region="bottom">
+        <div class="dialogButtonContainer">
+<!--
+          <div style="text-align: left;"> 
+            <input dojoType="dijit.form.CheckBox" dojoAttachPoint="invert_radio" /> 
+            Invert Selection: Match address EXCEPT those selected. 
+          </div> 
+-->
+          <button class="blueButton" dojoType="dijit.form.Button" dojoAttachPoint="doneButton" dojoAttachEvent="onClick: onExecute">Done</button>
+          <button dojoType="dijit.form.Button" dojoAttachPoint="cancelButton" dojoAttachEvent="onClick: onCancel">Cancel</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>

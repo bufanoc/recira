@@ -1,0 +1,24 @@
+<div>
+  <form dojoType="dijit.form.Form" dojoAttachEvent="onSubmit:formSubmit">
+    <table width="100%" cellspacing="0" cellpadding="0" class="TableFirewallPolicy" style="background:none;border:none">
+      <tr>
+        <td><label>Host Name:</label></td>
+        <td><input dojoType="nox.ext.apps.vmanui.HostNameTextbox" name="hostname"
+             dojoAttachPoint="hostNameInput" type="text" required="true" style="padding:0"
+             dojoAttachEvent="onKeyUp:_check_submit_enabled" /></td>
+      </tr>
+      <tr>
+        <td><label>Domain Name:</label></td>
+        <td><input dojoType="nox.ext.apps.vmanui.DomainNameTextbox" name="domainname"
+             dojoAttachPoint="domainNameInput" type="text" required="false" style="padding:0"
+             dojoAttachEvent="onKeyUp:_check_submit_enabled" /></td>
+      </tr>
+    </table>
+
+    <div class="dialogButtonContainer">
+      <button class="blueButton" dojoType="dijit.form.Button" dojoAttachPoint="submit_button" disabled="true" type="submit">Make Changes</button>
+      <button dojoType="dijit.form.Button" dojoAttachEvent="onClick:onCancel">Cancel</button>
+    </div>
+
+  </form>
+</div>

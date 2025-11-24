@@ -1,0 +1,3 @@
+/* Copyright (c) 2008, 2009, 2010 Nicira, Inc. */
+
+if(!dojo._hasResource["nox.ext.apps.commonui.directory.DLAddrGroupStore"]){dojo._hasResource["nox.ext.apps.commonui.directory.DLAddrGroupStore"]=true;dojo.provide("nox.ext.apps.commonui.directory.DLAddrGroupStore");dojo.require("nox.ext.apps.commonui.directory._PrincipalStore");dojo.require("nox.ext.apps.commonui.directory._PrincipalGroupStore");dojo.require("nox.ext.apps.commonui.directory.DLAddrGroup");dojo.declare("nox.ext.apps.commonui.directory.DLAddrGroupStore",[nox.ext.apps.commonui.directory._PrincipalGroupStore],{constructor:function(_1){this.itemConstructor=nox.ext.apps.commonui.directory.DLAddrGroup;if(this.url==null){this.url="/ws.v1/group/dladdr";}}});}

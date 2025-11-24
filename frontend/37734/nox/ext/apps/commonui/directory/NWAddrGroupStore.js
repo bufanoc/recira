@@ -1,0 +1,3 @@
+/* Copyright (c) 2008, 2009, 2010 Nicira, Inc. */
+
+if(!dojo._hasResource["nox.ext.apps.commonui.directory.NWAddrGroupStore"]){dojo._hasResource["nox.ext.apps.commonui.directory.NWAddrGroupStore"]=true;dojo.provide("nox.ext.apps.commonui.directory.NWAddrGroupStore");dojo.require("nox.ext.apps.commonui.directory._PrincipalStore");dojo.require("nox.ext.apps.commonui.directory._PrincipalGroupStore");dojo.require("nox.ext.apps.commonui.directory.NWAddrGroup");dojo.declare("nox.ext.apps.commonui.directory.NWAddrGroupStore",[nox.ext.apps.commonui.directory._PrincipalGroupStore],{constructor:function(_1){this.itemConstructor=nox.ext.apps.commonui.directory.NWAddrGroup;if(this.url==null){this.url="/ws.v1/group/nwaddr";}}});}

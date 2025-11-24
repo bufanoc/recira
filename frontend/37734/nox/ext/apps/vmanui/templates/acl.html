@@ -1,0 +1,28 @@
+    <tr class="aclRow">
+	  <td width="8%" align="left" style="border-left: 1px solid #CCC">
+        <a class="acl-action-link" dojoAttachPoint="actionLink">${acl.action}</a>
+      </td>
+      <td width="10%" align="left">
+        <a class="acl-protocol-link" dojoAttachPoint="protocolLink">${proto_text}</a>
+      </td>
+      <td width="6%">
+        <a class="acl-direction-link" dojoAttachPoint="directionLink">${dir_text}</a>
+      </td>
+      <td width="25%">
+        <a class="acl-remote-link" dojoAttachPoint="remoteLink">${remote_text}</a>
+      </td>
+      <td width="40%" align="left" class="acl-desc">
+        <span dojoAttachPoint="desc_box" dojoType="dijit.InlineEditBox" class="acl-desc-link"
+            noValueIndicator="&lt; none &gt;">${desc_text}</span>
+      </td>
+      <td width="40%" align="left" class="acl-rule">
+        <span class="acl-rule-link">${acl.rule}</span>
+      </td>
+      <td align="left" class="acl-hit-count">
+        <span id="${acl_hits_id}">-</span>
+      </td>
+      <td align="center" width="3%" class="acl-button" style="border-right: 1px solid #CCC">
+        <a class="acl-num-link" dojoAttachPoint="numLink">${acl.ui_index}</a>
+      </td>
+    </tr>
+

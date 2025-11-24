@@ -1,0 +1,29 @@
+<div class="${role.xen_type}-shell">
+  <div class="ruleContainer">
+    <div dojoAttachPoint="header" class="policyHeader ${role.xen_type} policyExpand">
+      <span class="expandToggle" dojoAttachEvent="onclick:toggleVisibility" dojoAttachPoint="visibility_link"></span>
+      <span class="policyLabel" dojoAttachPoint="header_label"></span>
+      <span class="policyViewOthers" dojoAttachPoint="view_others"></span>
+    </div>
+    <table width="100%" cellspacing="0" cellpadding="0" dojoAttachPoint="table" class="TableFirewallPolicy acl-table">
+      <tr class="${classname}">
+        <th align="left" class="TableHeaderGradientLight" style="border-left: 1px solid #BFBFBF;">Action</th>
+        <th align="left" class="TableHeaderGradientLight">Protocol</th>
+        <th align="left" class="TableHeaderGradientLight">Direction</th>
+        <th align="left" class="TableHeaderGradientLight">Remote Addresses</th>
+        <th align="left" class="TableHeaderGradientLight">
+          <span>
+            <input dojoType="dijit.form.RadioButton" name="descRuleToggle" dojoAttachPoint="desc_toggle" type="radio" checked="checked" class="descRadio" dojoAttachEvent="onClick:onShowDesc" />
+            Description
+          </span>
+          <span>
+            <input dojoType="dijit.form.RadioButton" name="descRuleToggle" dojoAttachPoint="rule_toggle" type="radio" class="ruleRadio" dojoAttachEvent="onClick:onShowRule" />
+            Rule Details
+          </span>
+        </th>
+        <th align="left" nowrap="nowrap" class="TableHeaderGradientLight acl-hit-count">Hit Count</th>
+        <th align="center" class="TableHeaderGradientLight gear-image-table-header-light" dojoAttachPoint="modify_cell">&nbsp;</th>
+      </tr>
+    </table>
+  </div>
+</div>

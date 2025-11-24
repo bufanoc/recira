@@ -1,0 +1,17 @@
+<div class="visibility_table">
+  <div style="border-bottom:1px solid #CCCCCC;margin-bottom:5px;text-align:right;">
+    <span class="netflow_pool_warning" style="visibility:visible;float:left;" dojoAttachPoint="netflow_config_warning">
+      <span style="color:red;font-weight:bold">Warning:</span> <span class="link" dojoAttachPoint="pool_warning_label">One or more selected pools</span> is not configured to forward NetFlow records to ${app_name_short}
+    </span>
+    <span>${interval_str}</span>
+  </div>
+  <table dojoAttachPoint="bidir_table" class="visibility_table_bidir">
+    <tbody>
+      <tr>
+        <td dojoAttachPoint="bidir_in_table_cell" class="bidir_table_cell inbound_table_cell"></td>
+        <td dojoAttachPoint="bidir_out_table_cell" class="bidir_table_cell outbound_table_cell"></td>
+      </tr>
+    </tbody>
+  </table>
+  <div dojoAttachPoint="unidir_table" class="visibility_table_unidir"></div>
+</div>

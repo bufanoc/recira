@@ -1,0 +1,79 @@
+
+<div>
+  <form dojoType="dijit.form.Form" dojoAttachEvent="onSubmit:formSubmit">
+
+<table width="100%" cellspacing="0" cellpadding="0" class="TableFirewallPolicy" style="background: none; border: none;">
+  <tr>
+    <td colspan="2"><input dojoType="dijit.form.RadioButton" name="dhcp_enabled"
+        dojoAttachPoint="dhcp_yes_radio" type="radio"
+        dojoAttachEvent="onChange:_sync_to_radio"
+        /> Use DHCP
+    </td>
+  </tr>
+</table>
+<div id="dhcp_message" class="hint hidden">
+DHCP is not available on this controller because at least one of the resource pools is configured to use
+'fail-safe' mode, which is incompatible with DHCP.
+</div>
+
+<table width="100%" cellspacing="0" cellpadding="0" class="TableFirewallPolicy" style="background: none; border: none;">
+  <tr>
+    <td colspan="2"><input dojoType="dijit.form.RadioButton" name="dhcp_enabled"
+        dojoAttachPoint="dhcp_no_radio" type="radio"
+        dojoAttachEvent="onChange:_sync_to_radio"
+        /> Manual Configuration
+    </td>
+  </tr>
+  <tr>
+    <td><label>IP Address:</label></td>
+    <td><input dojoType="nox.ext.apps.vmanui.regex.IPv4TextBox"
+              dojoAttachPoint="address_text" type="text"
+              required="true" style="padding: 0;"
+              dojoAttachEvent="onKeyUp:_check_submit_enabled"/></td>
+  </tr>
+  <tr>
+    <td><label>Netmask:</label></td>
+    <td><input dojoType="nox.ext.apps.vmanui.regex.IPv4Netmask"
+              dojoAttachPoint="netmask_text" type="text"
+              required="true" style="padding: 0;"
+              dojoAttachEvent="onKeyUp:_check_submit_enabled"/></td>
+  </tr>
+  <tr>
+    <td><label>Gateway:</label></td>
+    <td><input dojoType="nox.ext.apps.vmanui.regex.IPv4TextBox"
+              dojoAttachPoint="gateway_text" type="text"
+              required="false" style="padding: 0;"
+              dojoAttachEvent="onKeyUp:_check_submit_enabled"/></td>
+  </tr>
+  <tr>
+    <td style="vertical-align:top;padding-top:10px;white-space:nowrap"><label>DNS Servers:</label></td>
+    <td>
+      <input dojoType="nox.ext.apps.vmanui.regex.IPv4TextBox"
+            dojoAttachPoint="dns-nameserver0_text" type="text"
+            required="false" style="padding: 0;"
+            dojoAttachEvent="onKeyUp:_check_submit_enabled"/>
+      <br/>
+      <input dojoType="nox.ext.apps.vmanui.regex.IPv4TextBox"
+           dojoAttachPoint="dns-nameserver1_text" type="text"
+           required="false" style="padding: 0;"
+           dojoAttachEvent="onKeyUp:_check_submit_enabled"/>
+    </td>
+  </tr>
+  <tr>
+    <td><label>Search Domain:</label></td>
+    <td><input dojoType="nox.ext.apps.vmanui.regex.DNSSearchTextBox"
+              dojoAttachPoint="dns-search_text" style="padding: 0;"
+              dojoAttachEvent="onKeyUp:_check_submit_enabled"/></td>
+  </tr>
+</table>
+
+<div class="dialogButtonContainer">
+  <button class="blueButton" dojoType="dijit.form.Button"
+    dojoAttachPoint="submit_button" disabled="true" type="submit">
+    Make Changes </button>
+  <button dojoType="dijit.form.Button" dojoAttachEvent="onClick:onCancel">Cancel
+  </button>
+</div>
+
+  </form>
+</div>

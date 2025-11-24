@@ -1,0 +1,104 @@
+<div class="protocol_modify">
+
+  <div class="protocol_section">Ethertype</div>
+
+  <div class="protocol_inputs">
+    <input dojoType="dijit.form.RadioButton" name="ethertype" dojoAttachPoint="ethertype_ip" type="radio" />
+    <label>IP</label>
+    <input dojoType="dijit.form.RadioButton" name="ethertype" dojoAttachPoint="ethertype_other" type="radio" />
+    <label>Other</label>
+    <input dojoType="nox.ext.apps.vmanui.regex.EthertypeTextBox" dojoAttachPoint="ethertype_other_text" style="width: 120px; padding: 0;"/>
+  </div>
+
+  <div class="protocol_section" dojoAttachPoint="ip_row1">IP Protocol</div>
+
+  <div class="protocol_inputs" dojoAttachPoint="ip_row2">
+    <input dojoType="dijit.form.RadioButton" name="iptype" dojoAttachPoint="iptype_any" type="radio" />
+    <label>Any</label>
+    <input dojoType="dijit.form.RadioButton" name="iptype" dojoAttachPoint="iptype_tcp" type="radio" />
+    <label>TCP</label>
+    <input dojoType="dijit.form.RadioButton" name="iptype" dojoAttachPoint="iptype_udp" type="radio" />
+    <label>UDP</label>
+    <input dojoType="dijit.form.RadioButton" name="iptype" dojoAttachPoint="iptype_icmp" type="radio" />
+    <label>ICMP</label>
+    <input dojoType="dijit.form.RadioButton" name="iptype" dojoAttachPoint="iptype_other" type="radio" />
+    <label>Other</label>
+    <input dojoType="nox.ext.apps.vmanui.regex.IPProtocolTextBox" dojoAttachPoint="iptype_other_text" style="width: 80px; padding: 0;"/>
+  </div>
+
+  <div class="protocol_section" dojoAttachPoint="tport_row1">Destination Port</div>
+
+  <div class="protocol_inputs" dojoAttachPoint="tport_row2">
+    <input dojoType="dijit.form.RadioButton" name="dst_port" dojoAttachPoint="dst_port_any" type="radio" />
+    <label>Any</label>
+    <input dojoType="dijit.form.RadioButton" name="dst_port" dojoAttachPoint="dst_port_only" type="radio" />
+    <label>Only</label> port
+    <input dojoType="nox.ext.apps.vmanui.regex.TransportPortTextBox" dojoAttachPoint="dst_port_text" style="width: 120px; padding: 0;" />
+  </div>
+
+  <div class="protocol_section" dojoAttachPoint="tport_row3">Source Port</div>
+
+  <div class="protocol_inputs" dojoAttachPoint="tport_row4">
+    <input dojoAttachPoint="src_port_any" type="radio" dojoType="dijit.form.RadioButton" name="src_port"/>
+    <label>Any</label>
+    <input dojoType="dijit.form.RadioButton" name="src_port" dojoAttachPoint="src_port_only" type="radio" />
+    <label>Only</label> port
+    <input dojoType="nox.ext.apps.vmanui.regex.TransportPortTextBox" dojoAttachPoint="src_port_text" style="width: 120px; padding: 0;" />
+  </div>
+
+  <div class="protocol_section" dojoAttachPoint="icmp_row1" style="display: none;">ICMP Type</div>
+
+  <div class="protocol_inputs" dojoAttachPoint="icmp_row2" style="display: none;">
+    <input dojoType="dijit.form.RadioButton" name="icmp_type" dojoAttachPoint="icmp_type_any" type="radio" />
+    <label>Any</label>
+    <input dojoType="dijit.form.RadioButton" name="icmp_type" dojoAttachPoint="icmp_type_only" type="radio" />
+    <label>Only</label> type
+    <input dojoType="nox.ext.apps.vmanui.regex.ICMPTypeTextBox" dojoAttachPoint="icmp_type_text" style="width: 120px; padding: 0;" />
+  </div>
+
+  <div class="protocol_section" dojoAttachPoint="icmp_row3" style="display: none;">ICMP Code</div>
+
+  <div class="protocol_inputs" dojoAttachPoint="icmp_row4" style="display: none;">
+    <input dojoAttachPoint="icmp_code_any" type="radio" dojoType="dijit.form.RadioButton" name="icmp_code"/>
+    <label>Any</label>
+    <input dojoType="dijit.form.RadioButton" name="icmp_code" dojoAttachPoint="icmp_code_only" type="radio" />
+    <label>Only</label> code
+    <input dojoType="nox.ext.apps.vmanui.regex.ICMPCodeTextBox" dojoAttachPoint="icmp_code_text" style="width: 120px; padding: 0;" />
+  </div>
+
+  <div class="protocol_inputs">
+    <input dojoAttachPoint="bidirectional" dojoType="dijit.form.CheckBox" type="checkbox" />Match reply traffic
+  </div>
+
+  <div class="protocol_section">One-time Use vs. Multiple Uses</div>
+
+  <div class="protocol_inputs" dojoAttachPoint="div_name_custom">
+    <input dojoType="dijit.form.RadioButton" name="name_type" dojoAttachPoint="name_custom" type="radio" />
+    Only use it once. Do NOT add it to the list of protocols.
+  </div>
+
+  <div class="protocol_inputs">
+    <input dojoType="dijit.form.RadioButton" name="name_type" dojoAttachPoint="name_save" type="radio" />
+    Create a name for it and add it to the list of protocols.
+    <input dojoType="dijit.form.ValidationTextBox" dojoAttachPoint="name" promptMessage="Enter any string name for this protocol" style="width: 120px; margin-left: 14px; padding: 0;"/>
+  </div>
+
+  <div class="dialogButtonContainer">
+{% if is_standalone %}
+    <button class="blueButton" dojoType="dijit.form.Button" dojoAttachPoint="save_button">
+      Save &amp; Use
+    </button>
+    <button dojoType="dijit.form.Button" dojoAttachPoint="cancel_button">
+      Cancel
+    </button>
+{% else %}
+    <button class="blueButton" dojoType="dijit.form.Button" dojoAttachPoint="save_button">
+      Save Protocol Changes
+    </button>
+    <button dojoType="dijit.form.Button" dojoAttachPoint="delete_button">
+      Delete Protocol
+    </button>
+{% endif %}
+  </div>
+
+</div>

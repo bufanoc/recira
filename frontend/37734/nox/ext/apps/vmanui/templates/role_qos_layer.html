@@ -1,0 +1,63 @@
+
+<div style="" > 
+  
+  <p class="qosHeader {{role.xen_type}}">
+    <span dojoAttachPoint="label"></span>  
+  {% if is_bottom %}
+            </p> 
+            <input dojoType="dijit.form.RadioButton" name="qos_config" 
+            dojoAttachPoint="inherit" type="radio" 
+            dojoAttachEvent="onClick:onRadioChange"/>
+            {% if is_global  %}  
+              No global QoS policy
+            {% else %} 
+              Inherit QoS policy from parent 
+            {% endif %}
+            <div dojoAttachPoint="off_block"> 
+            <br> 
+            <input dojoType="dijit.form.RadioButton" name="qos_config"
+            dojoAttachPoint="off" type="radio"  
+            dojoAttachEvent="onClick:onRadioChange"/>
+            Disable inherited QoS policy
+            </div> 
+            <br> 
+            <input dojoType="dijit.form.RadioButton" name="qos_config"
+            dojoAttachPoint="set" type="radio" 
+            dojoAttachEvent="onClick:onRadioChange"/>
+            Apply a QoS limit of 
+            <input dojoType="dijit.form.NumberSpinner"
+            constraints="{min:1,places:0}"
+            smallDelta="1"
+            required="true"
+            intermediateChanges="true"
+            dojoAttachPoint="set_rate" style="width:100px;"
+            dojoAttachEvent="onClick:onEdit" />  
+            <select dojoType="dijit.form.FilteringSelect" dojoAttachPoint="set_rate_unit" 
+              style="width: 100px" dojoAttachEvent="onClick:onEdit" > 
+              <option value="1000" selected="true"> Kbit / sec </option> 
+              <option value="1000000"> Mbit / sec </option> 
+              <option value="1000000000"> Gbit / sec </option> 
+            </select>
+            with a burst size of  
+            <input dojoType="nox.ext.apps.vmanui.role_qos_layer.BurstSizeNumberSpinner"
+            constraints="{min:1,places:0}"
+            intermediateChanges="true"
+            smallDelta="1"
+            required="true" 
+            dojoAttachPoint="set_burst" style="width:100px;"
+            dojoAttachEvent="onClick:onEdit" />  
+            <select dojoType="dijit.form.FilteringSelect" dojoAttachPoint="set_burst_unit" 
+              style="width: 100px" dojoAttachEvent="onClick:onEdit, onChange:onChangeBurstUnit" > 
+              <option value="1000" selected="true"> Kbits </option> 
+              <option value="1000000"> Mbits </option> 
+              <option value="1000000000"> Gbits </option> 
+            </select> 
+          
+   {% else %} 
+   <span dojoAttachPoint="text_desc"> </span> 
+   <span class="policyViewOthers" dojoAttachPoint="view_others"></span> 
+      
+   </p> 
+            <div class="innerContainer" dojoAttachPoint="inner_div" ></div> 
+   {% endif %} 
+</div>  

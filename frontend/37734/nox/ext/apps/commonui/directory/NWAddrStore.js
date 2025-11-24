@@ -1,0 +1,3 @@
+/* Copyright (c) 2008, 2009, 2010 Nicira, Inc. */
+
+if(!dojo._hasResource["nox.ext.apps.commonui.directory.NWAddrStore"]){dojo._hasResource["nox.ext.apps.commonui.directory.NWAddrStore"]=true;dojo.provide("nox.ext.apps.commonui.directory.NWAddrStore");dojo.require("nox.ext.apps.commonui.directory._PrincipalStore");dojo.require("nox.ext.apps.commonui.directory.NWAddr");dojo.declare("nox.ext.apps.commonui.directory.NWAddrStore",[nox.ext.apps.commonui.directory._PrincipalStore],{constructor:function(_1){this.itemConstructor=this.dmws.NWAddr;},_unpackData:function(_2){var _3=[];dojo.forEach(_2,function(i){_3.push({"ip_str":i});});return _3;}});dojo.extend(nox.ext.apps.commonui.directory.NWAddrStore,dojo.data.util.simpleFetch);}

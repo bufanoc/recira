@@ -1,0 +1,3 @@
+/* Copyright (c) 2008, 2009, 2010 Nicira, Inc. */
+
+if(!dojo._hasResource["nox.ext.apps.vmanui.dialog.main"]){dojo._hasResource["nox.ext.apps.vmanui.dialog.main"]=true;dojo.provide("nox.ext.apps.vmanui.dialog.main");dojo.require("nox.ext.apps.vmanui.dialog.pool_connect_status");dojo.require("nox.ext.apps.vmanui.dialog.pool_edit");dojo.require("nox.ext.apps.vmanui.dialog.select_existing_protocol");dojo.require("nox.ext.apps.vmanui.dialog.protocol_edit");dojo.require("nox.ext.apps.vmanui.dialog.controller_addr_edit");dojo.require("nox.ext.apps.vmanui.dialog.controller_hostname_edit");}

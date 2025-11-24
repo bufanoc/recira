@@ -1,0 +1,3 @@
+/* Copyright (c) 2008, 2009, 2010 Nicira, Inc. */
+
+if(!dojo._hasResource["nox.ext.apps.commonui.directory.LocationStore"]){dojo._hasResource["nox.ext.apps.commonui.directory.LocationStore"]=true;dojo.provide("nox.ext.apps.commonui.directory.LocationStore");dojo.require("nox.ext.apps.commonui.directory._PrincipalStore");dojo.require("nox.ext.apps.commonui.directory.Location");dojo.declare("nox.ext.apps.commonui.directory.LocationStore",[nox.ext.apps.commonui.directory._PrincipalStore],{constructor:function(_1){this.itemConstructor=this.dmws.Location;if(this.url==null){this.url="/ws.v1/location";}}});}

@@ -1,0 +1,3 @@
+/* Copyright (c) 2008, 2009, 2010 Nicira, Inc. */
+
+if(!dojo._hasResource["nox.ext.apps.commonui.coreui.png"]){dojo._hasResource["nox.ext.apps.commonui.coreui.png"]=true;dojo.provide("nox.ext.apps.commonui.coreui.png");(function(){if(dojo.isIE&&dojo.isIE<7&&document.styleSheets&&document.styleSheets[0]&&document.styleSheets[0].addRule){var _1=dojo.moduleUrl("nox.ext.apps.commonui.coreui.png","iepngfix.htc");document.styleSheets[0].addRule("*","behavior: url(\""+_1.path+"\")");}})();}

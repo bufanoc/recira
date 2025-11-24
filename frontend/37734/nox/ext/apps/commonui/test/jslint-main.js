@@ -1,0 +1,3 @@
+/* Copyright (c) 2008, 2009, 2010 Nicira, Inc. */
+
+(function(a){var e,i,_4;if(!a[0]){print("Usage: jslint.js file.js");quit(1);}_4=readFile(a[0]);if(!_4){print("jslint: Couldn't open file '"+a[0]+"'.");quit(1);}if(!JSLINT(_4,{bitwise:true,browser:true,cap:true,css:true,evil:false,forin:true,indent:false,laxbreak:true,maxerr:200,passfail:false,regexp:false,sub:true,undef:false,})){for(i=0;i<JSLINT.errors.length;i+=1){e=JSLINT.errors[i];if(e){print(a[0]+":"+e.line+":"+e.character+": "+e.reason);print((e.evidence||"").replace(/^\s*(\S*(\s+\S+)*)\s*$/,"$1"));print("");}}quit(2);}else{print("jslint: No problems found in "+a[0]);quit();}}(arguments));

@@ -1,0 +1,29 @@
+<div class="list_editor" style="text-align:left">
+  <table dojoAttachPoint="tableNode" class="list_editor_table">
+    <tr>
+      <td>
+        <div dojoAttachPoint="emptyNode" class="list_editor_empty">
+          <div dojoAttachPoint="emptyTextRegular" class="list_editor_empty_regular">Click + to add an item to this list</div>
+          <div dojoAttachPoint="emptyTextReadOnly" class="list_editor_empty_readonly">There are no items in this list</div>
+        </div>
+        <div dojoAttachPoint="contentNode" class="list_editor_contents"></div>
+      </td>
+      <td rowspan="2">
+        <div class="list_editor_controls">
+          <button dojoType="dijit.form.Button" class="blueButton" dojoAttachPoint="save_button">Save Target VLAN Changes</button>
+          <button dojoType="dijit.form.Button" dojoAttachPoint="reset_button">Undo Changes</button>
+        </div>
+        <div dojoAttachPoint="infoNode" class="list_editor_item_info" style="display:none"></div>
+        <div dojoAttachPoint="errorNode" class="list_editor_error"></div>
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <div class="list_editor_item_controls">
+          <button dojoType="dijit.form.Button" dojoAttachPoint="add_button">+</button>
+          <button dojoType="dijit.form.Button" dojoAttachPoint="delete_button">&minus;</button>
+        </div>
+      </td>
+    </tr>
+  </table>
+</div>

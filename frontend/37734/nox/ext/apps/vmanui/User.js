@@ -1,0 +1,3 @@
+/* Copyright (c) 2008, 2009, 2010 Nicira, Inc. */
+
+if(!dojo._hasResource["nox.ext.apps.vmanui.User"]){dojo._hasResource["nox.ext.apps.vmanui.User"]=true;dojo.provide("nox.ext.apps.vmanui.User");dojo.declare("nox.ext.apps.vmanui._User",null,{constructor:function(){this.__capabilities={};this.__user=null;this.__role=null;},setUsername:function(_1){this.__username=_1.replace("Built-in;","");},username:function(){return this.__username;},setRole:function(_2){this.__role=_2;},role:function(){return this.__role.toLowerCase().replace(/\W/g,"");},addCapability:function(_3){if(_3){this.__capabilities[_3]=true;}},hasCapability:function(_4){return (this.__capabilities[_4]===true);}});nox.ext.apps.vmanui.User=new nox.ext.apps.vmanui._User();}
