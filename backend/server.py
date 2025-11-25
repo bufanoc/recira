@@ -3,7 +3,7 @@
 VXLAN Web Controller - Backend Server with Real OVS Discovery
 Repurposed from DVSC for generic OVS/VXLAN management
 
-Version: 0.7.1 - Host Persistence + DHCP Integration
+Version: 0.7.2 - Tunnel Discovery + Host Persistence + DHCP Integration
 """
 
 import http.server
@@ -82,7 +82,7 @@ class VXLANRequestHandler(http.server.SimpleHTTPRequestHandler):
 
             response = {
                 "status": "running",
-                "version": "0.7.1",
+                "version": "0.7.2",
                 "uptime": uptime_str,
                 "controller": "Recira - Virtual Network Platform",
                 "hosts": len(ovs_manager.get_all_hosts()),
@@ -561,6 +561,7 @@ def main():
     # Initialize VXLAN manager
     print("\n🔗 Initializing VXLAN tunnel manager...")
     vxlan_manager = vxlan_mgr.initialize(ovs_manager)
+    vxlan_manager.discover_tunnels()
     print("   ✅ VXLAN manager ready")
 
     # Initialize Network manager

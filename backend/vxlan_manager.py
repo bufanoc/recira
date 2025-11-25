@@ -17,6 +17,170 @@ class VXLANManager:
         self.next_tunnel_id = 1
         self.next_vni = 100  # Start VNI from 100
 
+    def discover_tunnels(self):
+        """Discover existing VXLAN tunnels from all OVS bridges"""
+        print("   Discovering existing VXLAN tunnels...")
+        discovered = 0
+
+        # Track unique tunnels by (vni, local_ip, remote_ip) to avoid duplicates
+        seen_tunnels = set()
+
+        hosts = self.ovs_manager.get_all_hosts()
+        for host in hosts:
+            host_ip = host.get('vxlan_ip') or host.get('ip')
+            vxlan_ports = self._get_vxlan_ports(host)
+
+            for port_info in vxlan_ports:
+                vni = port_info['vni']
+                remote_ip = port_info['remote_ip']
+                bridge = port_info['bridge']
+                port_name = port_info['port_name']
+
+                # Create a canonical key (smaller IP first) to dedupe bidirectional tunnels
+                ips = tuple(sorted([host_ip, remote_ip]))
+                tunnel_key = (vni, ips[0], ips[1])
+
+                if tunnel_key in seen_tunnels:
+                    continue
+                seen_tunnels.add(tunnel_key)
+
+                # Find the remote host
+                remote_host = self._find_host_by_vxlan_ip(remote_ip)
+                if not remote_host:
+                    # Remote host not managed by us, skip
+                    continue
+
+                # Find switches
+                src_switch = self._find_switch_on_host(host['id'], bridge)
+                dst_switch = self._find_switch_on_host_by_vxlan_ip(remote_ip)
+
+                if not src_switch or not dst_switch:
+                    continue
+
+                # Calculate port names
+                dst_ip_suffix = remote_ip.split('.')[-1]
+                src_ip_suffix = host_ip.split('.')[-1]
+
+                tunnel_info = {
+                    'id': self.next_tunnel_id,
+                    'src_switch_id': src_switch['id'],
+                    'dst_switch_id': dst_switch['id'],
+                    'src_switch_name': src_switch['name'],
+                    'dst_switch_name': dst_switch['name'],
+                    'src_host': host['hostname'],
+                    'dst_host': remote_host['hostname'],
+                    'vni': vni,
+                    'src_vxlan_ip': host_ip,
+                    'dst_vxlan_ip': remote_ip,
+                    'tunnel_name_src': f"vxlan{vni}_{dst_ip_suffix}",
+                    'tunnel_name_dst': f"vxlan{vni}_{src_ip_suffix}",
+                    'status': 'up',
+                    'discovered': True
+                }
+
+                self.tunnels[self.next_tunnel_id] = tunnel_info
+                self.next_tunnel_id += 1
+                discovered += 1
+
+                # Update next_vni to avoid conflicts
+                if vni >= self.next_vni:
+                    self.next_vni = vni + 1
+
+        print(f"      Discovered {discovered} existing tunnel(s)")
+        return discovered
+
+    def _get_vxlan_ports(self, host: Dict) -> List[Dict]:
+        """Get all VXLAN ports from a host's bridges"""
+        vxlan_ports = []
+        try:
+            if host['type'] == 'localhost':
+                cmd = ['ovs-vsctl', 'show']
+                result = subprocess.check_output(cmd, text=True)
+            else:
+                ssh_cmd = self._build_ssh_cmd(host)
+                cmd = ssh_cmd + ['ovs-vsctl', 'show']
+                result = subprocess.check_output(cmd, text=True, stderr=subprocess.DEVNULL)
+
+            # Parse ovs-vsctl show output
+            current_bridge = None
+            current_port = None
+            current_type = None
+            current_options = {}
+
+            for line in result.split('\n'):
+                line = line.strip()
+                if line.startswith('Bridge '):
+                    current_bridge = line.split()[1].strip('"')
+                elif line.startswith('Port '):
+                    # Save previous port if it was vxlan
+                    if current_port and current_type == 'vxlan' and 'remote_ip' in current_options:
+                        vni = int(current_options.get('key', '0').strip('"'))
+                        remote_ip = current_options.get('remote_ip', '').strip('"')
+                        if vni and remote_ip:
+                            vxlan_ports.append({
+                                'bridge': current_bridge,
+                                'port_name': current_port,
+                                'vni': vni,
+                                'remote_ip': remote_ip
+                            })
+                    current_port = line.split()[1].strip('"')
+                    current_type = None
+                    current_options = {}
+                elif line.startswith('type: '):
+                    current_type = line.split(': ')[1]
+                elif line.startswith('options: '):
+                    # Parse options: {key="1003", remote_ip="10.172.88.233"}
+                    opts_str = line.split(': ', 1)[1]
+                    opts_str = opts_str.strip('{}')
+                    for opt in opts_str.split(', '):
+                        if '=' in opt:
+                            k, v = opt.split('=', 1)
+                            current_options[k] = v.strip('"')
+
+            # Don't forget last port
+            if current_port and current_type == 'vxlan' and 'remote_ip' in current_options:
+                vni = int(current_options.get('key', '0').strip('"'))
+                remote_ip = current_options.get('remote_ip', '').strip('"')
+                if vni and remote_ip:
+                    vxlan_ports.append({
+                        'bridge': current_bridge,
+                        'port_name': current_port,
+                        'vni': vni,
+                        'remote_ip': remote_ip
+                    })
+
+        except Exception as e:
+            print(f"      Error getting VXLAN ports from {host['hostname']}: {e}")
+
+        return vxlan_ports
+
+    def _find_host_by_vxlan_ip(self, vxlan_ip: str) -> Optional[Dict]:
+        """Find a host by its VXLAN IP"""
+        hosts = self.ovs_manager.get_all_hosts()
+        for host in hosts:
+            if host.get('vxlan_ip') == vxlan_ip or host.get('ip') == vxlan_ip:
+                return host
+        return None
+
+    def _find_switch_on_host(self, host_id: int, bridge_name: str) -> Optional[Dict]:
+        """Find a switch by host ID and bridge name"""
+        switches = self.ovs_manager.get_all_switches()
+        for switch in switches:
+            if switch['host_id'] == host_id and switch['name'] == bridge_name:
+                return switch
+        return None
+
+    def _find_switch_on_host_by_vxlan_ip(self, vxlan_ip: str) -> Optional[Dict]:
+        """Find the first switch on a host identified by VXLAN IP"""
+        host = self._find_host_by_vxlan_ip(vxlan_ip)
+        if not host:
+            return None
+        switches = self.ovs_manager.get_all_switches()
+        for switch in switches:
+            if switch['host_id'] == host['id']:
+                return switch
+        return None
+
     def create_tunnel(self, src_switch_id: int, dst_switch_id: int,
                      vni: Optional[int] = None) -> Optional[Dict]:
         """
@@ -169,9 +333,16 @@ class VXLANManager:
             return False
 
     def _build_ssh_cmd(self, host: Dict) -> List[str]:
-        """Build SSH command for remote host"""
-        ssh_cmd = ['sshpass', '-p', 'Xm9909ona', 'ssh', '-o', 'StrictHostKeyChecking=no']
-        ssh_cmd.append(f"root@{host['ip']}")
+        """Build SSH command for remote host using stored credentials"""
+        # Get credentials from ovs_manager
+        username, password = self.ovs_manager.get_host_credentials(host.get('ip'))
+        if not password:
+            # Fallback for backward compatibility
+            password = 'Xm9909ona'
+        if not username:
+            username = 'root'
+        ssh_cmd = ['sshpass', '-p', password, 'ssh', '-o', 'StrictHostKeyChecking=no']
+        ssh_cmd.append(f"{username}@{host['ip']}")
         return ssh_cmd
 
     def get_all_tunnels(self) -> List[Dict]:
