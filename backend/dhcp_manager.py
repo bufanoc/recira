@@ -143,7 +143,12 @@ class DHCPManager:
     def _create_gateway_port(self, host_ip: str, username: str, password: str,
                              bridge: str, port_name: str, gateway_ip: str,
                              vni: int, prefix: str = '24') -> bool:
-        """Create OVS internal port, tag with VNI, and assign gateway IP"""
+        """Create OVS internal port and assign gateway IP
+
+        Note: Gateway port is NOT tagged with VLAN. VXLAN tunnels use VNI for
+        encapsulation at the tunnel level - VLAN tagging within the bridge would
+        prevent traffic from flowing through the VXLAN tunnels properly.
+        """
         print(f"   Creating gateway port {port_name} on {bridge} (VNI {vni})...")
 
         # Check if port already exists
@@ -154,8 +159,13 @@ class DHCPManager:
 
         if rc == 0 and port_name in stdout:
             print(f"   Port {port_name} already exists")
+            # Remove any existing VLAN tag (fix for existing broken configs)
+            self._ssh_exec(
+                host_ip, username, password,
+                f'ovs-vsctl remove port {port_name} tag 2>/dev/null || true'
+            )
         else:
-            # Create internal port
+            # Create internal port (untagged - no VLAN tag)
             rc, stdout, stderr = self._ssh_exec(
                 host_ip, username, password,
                 f'ovs-vsctl add-port {bridge} {port_name} -- set interface {port_name} type=internal'
@@ -164,16 +174,6 @@ class DHCPManager:
                 print(f"   Failed to create port: {stderr}")
                 return False
             print(f"   Created internal port {port_name}")
-
-        # Tag the port with VNI (critical for overlay network isolation)
-        rc, stdout, stderr = self._ssh_exec(
-            host_ip, username, password,
-            f'ovs-vsctl set port {port_name} tag={vni}'
-        )
-        if rc != 0:
-            print(f"   Warning: Failed to tag port with VNI: {stderr}")
-        else:
-            print(f"   Tagged port {port_name} with VNI {vni}")
 
         # Assign IP address
         rc, stdout, stderr = self._ssh_exec(
