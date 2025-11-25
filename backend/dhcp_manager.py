@@ -28,7 +28,7 @@ from datetime import datetime
 class DHCPManager:
     """Manages DHCP services for overlay networks using dnsmasq"""
 
-    def __init__(self, ovs_manager, network_manager, config_file: str = '/tmp/recira-dhcp.json'):
+    def __init__(self, ovs_manager, network_manager, config_file: str = '/var/lib/recira/dhcp.json'):
         self.ovs_manager = ovs_manager
         self.network_manager = network_manager
         self.config_file = config_file
@@ -755,7 +755,7 @@ no-resolv
 dhcp_manager = None
 
 
-def initialize(ovs_mgr, network_mgr, config_file: str = '/tmp/recira-dhcp.json') -> DHCPManager:
+def initialize(ovs_mgr, network_mgr, config_file: str = '/var/lib/recira/dhcp.json') -> DHCPManager:
     """Initialize the global DHCP manager instance"""
     global dhcp_manager
     dhcp_manager = DHCPManager(ovs_mgr, network_mgr, config_file)

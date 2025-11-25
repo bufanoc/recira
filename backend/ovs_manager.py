@@ -20,7 +20,7 @@ from datetime import datetime
 class OVSManager:
     """Manages OVS bridges on local and remote hosts"""
 
-    def __init__(self, config_file: str = '/tmp/recira-hosts.json'):
+    def __init__(self, config_file: str = '/var/lib/recira/hosts.json'):
         self.hosts = {}  # {host_id: {hostname, ip, bridges, ...}}
         self.detached_hosts = {}  # {host_id: {hostname, ip, ...}} - hosts that were detached but not deleted
         self.next_host_id = 1

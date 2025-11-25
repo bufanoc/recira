@@ -64,7 +64,7 @@ class Network:
 class NetworkManager:
     """Manages virtual networks and their full-mesh tunnel provisioning"""
 
-    def __init__(self, ovs_manager, vxlan_manager, config_file: str = '/tmp/recira-networks.json'):
+    def __init__(self, ovs_manager, vxlan_manager, config_file: str = '/var/lib/recira/networks.json'):
         self.ovs_manager = ovs_manager
         self.vxlan_manager = vxlan_manager
         self.config_file = config_file
@@ -330,7 +330,7 @@ class NetworkManager:
 network_manager = None
 
 
-def initialize(ovs_mgr, vxlan_mgr, config_file: str = '/tmp/recira-networks.json') -> NetworkManager:
+def initialize(ovs_mgr, vxlan_mgr, config_file: str = '/var/lib/recira/networks.json') -> NetworkManager:
     """Initialize the global network manager instance"""
     global network_manager
     network_manager = NetworkManager(ovs_mgr, vxlan_mgr, config_file)
