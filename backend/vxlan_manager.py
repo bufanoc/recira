@@ -349,29 +349,54 @@ class VXLANManager:
         """Get all tunnels"""
         return list(self.tunnels.values())
 
+    def _get_switch_by_id(self, switch_id: int) -> Optional[Dict]:
+        """Get switch info by switch ID"""
+        switches = self.ovs_manager.get_all_switches()
+        return next((s for s in switches if s['id'] == switch_id), None)
+
+    def _get_host_for_switch(self, switch_id: int) -> Optional[Dict]:
+        """Get the host that a switch belongs to"""
+        switch = self._get_switch_by_id(switch_id)
+        if not switch:
+            return None
+        return self._get_host_by_id(switch['host_id'])
+
     def delete_tunnel(self, tunnel_id: int) -> bool:
         """Delete a tunnel"""
         if tunnel_id not in self.tunnels:
+            print(f"Tunnel {tunnel_id} not found in tunnel list")
             return False
 
         tunnel = self.tunnels[tunnel_id]
 
-        # Get host info
-        src_host = self._get_host_by_id(tunnel['src_switch_id'])
-        dst_host = self._get_host_by_id(tunnel['dst_switch_id'])
+        # Get host info by looking up the switch first, then getting its host
+        src_host = self._get_host_for_switch(tunnel['src_switch_id'])
+        dst_host = self._get_host_for_switch(tunnel['dst_switch_id'])
 
         if not src_host or not dst_host:
-            return False
+            print(f"Could not find hosts for tunnel {tunnel_id}")
+            print(f"  src_switch_id={tunnel['src_switch_id']}, dst_switch_id={tunnel['dst_switch_id']}")
+            # Still remove from our tracking even if we can't delete the ports
+            # (e.g., if host was removed)
+            del self.tunnels[tunnel_id]
+            return True
 
         # Delete both tunnel endpoints
         # Handle both old and new tunnel name formats for backward compatibility
         tunnel_name_src = tunnel.get('tunnel_name_src', tunnel.get('tunnel_name'))
         tunnel_name_dst = tunnel.get('tunnel_name_dst', tunnel.get('tunnel_name'))
 
-        self._del_vxlan_port(src_host, tunnel['src_switch_name'], tunnel_name_src)
-        self._del_vxlan_port(dst_host, tunnel['dst_switch_name'], tunnel_name_dst)
+        print(f"Deleting tunnel {tunnel_id}: {tunnel_name_src} on {src_host['hostname']}, {tunnel_name_dst} on {dst_host['hostname']}")
 
-        # Remove from dict
+        src_deleted = self._del_vxlan_port(src_host, tunnel['src_switch_name'], tunnel_name_src)
+        dst_deleted = self._del_vxlan_port(dst_host, tunnel['dst_switch_name'], tunnel_name_dst)
+
+        if not src_deleted:
+            print(f"  Warning: Failed to delete {tunnel_name_src} on {src_host['hostname']}")
+        if not dst_deleted:
+            print(f"  Warning: Failed to delete {tunnel_name_dst} on {dst_host['hostname']}")
+
+        # Remove from dict regardless of port deletion success
         del self.tunnels[tunnel_id]
 
         return True

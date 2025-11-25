@@ -122,6 +122,11 @@ class VXLANRequestHandler(http.server.SimpleHTTPRequestHandler):
 
             response = {"hosts": formatted_hosts}
 
+        elif path == '/api/hosts/detached':
+            # Get detached hosts that can be re-attached
+            detached = ovs_manager.get_detached_hosts()
+            response = {"detached_hosts": detached}
+
         elif path == '/api/topology':
             # Build topology from real switches (no links yet)
             switches = ovs_manager.get_all_switches()
@@ -468,6 +473,27 @@ class VXLANRequestHandler(http.server.SimpleHTTPRequestHandler):
                 )
                 response = scan_result
 
+        elif path == '/api/hosts/remove' and data:
+            # Remove a host (detach or forget)
+            host_id = data.get('host_id')
+            keep_data = data.get('keep_data', False)  # True = detach, False = forget
+
+            if not host_id:
+                response = {"error": "Missing required field: host_id"}
+            else:
+                result = ovs_manager.remove_host(int(host_id), keep_data=keep_data)
+                response = result
+
+        elif path == '/api/hosts/reattach' and data:
+            # Re-attach a previously detached host
+            host_id = data.get('host_id')
+
+            if not host_id:
+                response = {"error": "Missing required field: host_id"}
+            else:
+                result = ovs_manager.reattach_host(int(host_id))
+                response = result
+
         elif path == '/api/tunnels/create' and data:
             # Create a VXLAN tunnel
             src_switch_id = data.get('src_switch_id')
@@ -578,12 +604,15 @@ def main():
     print(f"\n✨ Open your browser to: http://localhost:{PORT}")
     print(f"   (or http://192.168.88.164:{PORT} from other machines)")
     print("\n" + "="*60)
-    print("API Endpoints (v0.7 - DHCP Integration!):")
+    print("API Endpoints (v0.7.3 - Host Management!):")
     print("  GET  /api/status              - Controller status")
     print("  GET  /api/switches            - Connected switches")
     print("  GET  /api/hosts               - OVS hosts")
+    print("  GET  /api/hosts/detached      - Detached hosts (can re-attach)")
     print("  POST /api/hosts/add           - Add remote host")
     print("  POST /api/hosts/provision     - Auto-provision host with OVS")
+    print("  POST /api/hosts/remove        - Remove host (detach or forget)")
+    print("  POST /api/hosts/reattach      - Re-attach detached host")
     print("  GET  /api/hosts/health        - Get host health status")
     print("  GET  /api/networks            - Virtual networks (with DHCP status)")
     print("  POST /api/networks/create     - Create network with full-mesh")
@@ -592,7 +621,7 @@ def main():
     print("  POST /api/tunnels/create      - Create VXLAN tunnel")
     print("  POST /api/tunnels/delete      - Delete VXLAN tunnel")
     print("  GET  /api/topology            - Network topology")
-    print("  --- DHCP Endpoints (NEW!) ---")
+    print("  --- DHCP Endpoints ---")
     print("  POST /api/dhcp/enable         - Enable DHCP for network")
     print("  POST /api/dhcp/disable        - Disable DHCP for network")
     print("  GET  /api/dhcp/config         - Get DHCP configuration")

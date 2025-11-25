@@ -646,6 +646,46 @@
                 </table>
             </div>
 
+            <!-- Managed Hosts Table -->
+            <div class="card" style="margin-top: 20px;">
+                <h2>🖥️ Managed Hosts</h2>
+                <table id="hosts-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Hostname</th>
+                            <th>Management IP</th>
+                            <th>VXLAN IP</th>
+                            <th>Type</th>
+                            <th>OVS Version</th>
+                            <th>Bridges</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="hosts-body">
+                        <tr><td colspan="8" style="text-align: center;">Loading...</td></tr>
+                    </tbody>
+                </table>
+                <!-- Detached Hosts Section -->
+                <div id="detached-hosts-section" style="display: none; margin-top: 15px; padding-top: 15px; border-top: 1px solid #3c3c3c;">
+                    <h3 style="color: #f39c12; font-size: 14px; margin-bottom: 10px;">📦 Detached Hosts (can re-attach)</h3>
+                    <table id="detached-hosts-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Hostname</th>
+                                <th>IP</th>
+                                <th>Last Bridges</th>
+                                <th>Detached At</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="detached-hosts-body">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
             <!-- Virtual Networks Table -->
             <div class="card" style="margin-top: 20px;">
                 <h2>🌐 Virtual Networks</h2>
@@ -1208,6 +1248,92 @@
             });
         }
 
+        // Host Management Functions (Detach, Forget, Re-attach)
+        function detachHost(hostId, hostname) {
+            if (!confirm(`Detach host "${hostname}"?\n\nThe host will be removed from active management but its data will be preserved. You can re-attach it later.`)) {
+                return;
+            }
+
+            fetch('/api/hosts/remove', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    host_id: hostId,
+                    keep_data: true  // Detach = keep data
+                })
+            })
+            .then(r => r.json())
+            .then(response => {
+                if (response.success) {
+                    alert(`Host "${hostname}" detached successfully.\n\nYou can re-attach it later from the "Detached Hosts" section.`);
+                    loadData();
+                } else {
+                    alert('Error detaching host: ' + (response.message || 'Unknown error'));
+                }
+            })
+            .catch(e => {
+                alert('Failed to detach host: ' + e);
+            });
+        }
+
+        function forgetHost(hostId, hostname) {
+            if (!confirm(`PERMANENTLY DELETE host "${hostname}"?\n\n⚠️ This action cannot be undone!\nAll host data will be permanently removed.`)) {
+                return;
+            }
+
+            // Double confirmation for destructive action
+            if (!confirm(`Are you SURE you want to permanently delete "${hostname}"?\n\nType OK to confirm.`)) {
+                return;
+            }
+
+            fetch('/api/hosts/remove', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    host_id: hostId,
+                    keep_data: false  // Forget = delete data
+                })
+            })
+            .then(r => r.json())
+            .then(response => {
+                if (response.success) {
+                    alert(`Host "${hostname}" permanently removed.`);
+                    loadData();
+                } else {
+                    alert('Error removing host: ' + (response.message || 'Unknown error'));
+                }
+            })
+            .catch(e => {
+                alert('Failed to remove host: ' + e);
+            });
+        }
+
+        function reattachHost(hostId, hostname) {
+            if (!confirm(`Re-attach host "${hostname}"?\n\nThe system will try to reconnect to the host using saved credentials.`)) {
+                return;
+            }
+
+            fetch('/api/hosts/reattach', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    host_id: hostId
+                })
+            })
+            .then(r => r.json())
+            .then(response => {
+                if (response.success) {
+                    alert(`Host "${hostname}" re-attached successfully!`);
+                    loadData();
+                } else {
+                    alert('Error re-attaching host: ' + (response.message || 'Unknown error'));
+                }
+            })
+            .catch(e => {
+                alert('Failed to re-attach host: ' + e);
+            });
+        }
+
         // Provision Host modal functions (Two-step workflow with interface selection)
         let provisionScannedInterfaces = [];
 
@@ -1737,14 +1863,84 @@
                         '<tr><td colspan="7" style="color: red;">Error loading tunnels</td></tr>';
                 });
 
-            // Load hosts
+            // Load hosts (full table)
             fetch('/api/hosts')
                 .then(r => r.json())
                 .then(data => {
                     document.getElementById('host-stat').textContent = data.hosts.length;
+
+                    let html = '';
+                    if (data.hosts.length === 0) {
+                        html = '<tr><td colspan="8" style="text-align: center; color: #7f8c8d;">No hosts. Click "Add Host" to get started!</td></tr>';
+                    } else {
+                        data.hosts.forEach(host => {
+                            const isLocalhost = host.type === 'localhost';
+                            const vxlanIp = host.vxlan_ip || host.ip;
+                            const bridges = host.bridges ? host.bridges.join(', ') : '-';
+
+                            let actions = '';
+                            if (isLocalhost) {
+                                actions = '<span style="color: #7f8c8d; font-size: 11px;">Local</span>';
+                            } else {
+                                actions = `
+                                    <button class="btn" style="font-size: 10px; padding: 2px 6px;" onclick="detachHost(${host.id}, '${host.hostname}')" title="Detach (keep data)">📦 Detach</button>
+                                    <button class="btn-danger" style="font-size: 10px; padding: 2px 6px;" onclick="forgetHost(${host.id}, '${host.hostname}')" title="Forget (delete)">🗑️ Forget</button>
+                                `;
+                            }
+
+                            html += `<tr>
+                                <td>${host.id}</td>
+                                <td><strong>${host.hostname}</strong></td>
+                                <td>${host.ip}</td>
+                                <td>${vxlanIp !== host.ip ? vxlanIp : '<span style="color:#7f8c8d">same</span>'}</td>
+                                <td>${isLocalhost ? '<span style="color:#3498db">localhost</span>' : 'remote'}</td>
+                                <td>${host.ovs_version || '-'}</td>
+                                <td>${bridges}</td>
+                                <td>${actions}</td>
+                            </tr>`;
+                        });
+                    }
+                    document.getElementById('hosts-body').innerHTML = html;
                 })
                 .catch(e => {
                     document.getElementById('host-stat').textContent = '?';
+                    document.getElementById('hosts-body').innerHTML =
+                        '<tr><td colspan="8" style="color: red;">Error loading hosts</td></tr>';
+                });
+
+            // Load detached hosts
+            fetch('/api/hosts/detached')
+                .then(r => r.json())
+                .then(data => {
+                    const section = document.getElementById('detached-hosts-section');
+                    const tbody = document.getElementById('detached-hosts-body');
+
+                    if (data.detached_hosts && data.detached_hosts.length > 0) {
+                        section.style.display = 'block';
+                        let html = '';
+                        data.detached_hosts.forEach(host => {
+                            const bridges = host.last_bridges ? host.last_bridges.join(', ') : '-';
+                            const detachedAt = host.detached_at ? new Date(host.detached_at).toLocaleString() : '-';
+
+                            html += `<tr>
+                                <td>${host.id}</td>
+                                <td>${host.hostname || '-'}</td>
+                                <td>${host.ip || '-'}</td>
+                                <td>${bridges}</td>
+                                <td style="font-size: 11px;">${detachedAt}</td>
+                                <td>
+                                    <button class="btn" style="font-size: 10px; padding: 2px 6px; background: #27ae60;" onclick="reattachHost(${host.id}, '${host.hostname}')" title="Re-attach host">🔄 Re-attach</button>
+                                    <button class="btn-danger" style="font-size: 10px; padding: 2px 6px;" onclick="forgetHost(${host.id}, '${host.hostname}')" title="Permanently delete">🗑️ Delete</button>
+                                </td>
+                            </tr>`;
+                        });
+                        tbody.innerHTML = html;
+                    } else {
+                        section.style.display = 'none';
+                    }
+                })
+                .catch(e => {
+                    document.getElementById('detached-hosts-section').style.display = 'none';
                 });
 
             // Load networks

@@ -22,6 +22,7 @@ class OVSManager:
 
     def __init__(self, config_file: str = '/tmp/recira-hosts.json'):
         self.hosts = {}  # {host_id: {hostname, ip, bridges, ...}}
+        self.detached_hosts = {}  # {host_id: {hostname, ip, ...}} - hosts that were detached but not deleted
         self.next_host_id = 1
         self.config_file = config_file
 
@@ -66,9 +67,17 @@ class OVSManager:
                             saved_hostname=host_data.get('hostname')
                         )
 
+                # Load detached hosts
+                detached = data.get('detached_hosts', {})
+                for host_id_str, host_data in detached.items():
+                    self.detached_hosts[int(host_id_str)] = host_data
+                if detached:
+                    print(f"   Loaded {len(detached)} detached host(s)")
+
                 # Update next_host_id to be higher than any loaded host
-                if self.hosts:
-                    max_id = max(self.hosts.keys())
+                all_ids = list(self.hosts.keys()) + list(self.detached_hosts.keys())
+                if all_ids:
+                    max_id = max(all_ids)
                     if max_id >= self.next_host_id:
                         self.next_host_id = max_id + 1
 
@@ -99,8 +108,14 @@ class OVSManager:
                     'saved_at': datetime.now().isoformat()
                 }
 
+            # Prepare detached hosts for saving
+            detached_to_save = {}
+            for host_id, host in self.detached_hosts.items():
+                detached_to_save[str(host_id)] = host
+
             data = {
                 'hosts': hosts_to_save,
+                'detached_hosts': detached_to_save,
                 'next_host_id': self.next_host_id,
                 'last_updated': datetime.now().isoformat(),
                 'warning': 'CONTAINS CLEARTEXT PASSWORDS - LAB USE ONLY'
@@ -498,6 +513,148 @@ class OVSManager:
             if host.get('ip') == host_ip or host.get('management_ip') == host_ip:
                 return host.get('ssh_user', 'root'), host.get('ssh_password', '')
         return 'root', ''
+
+    def remove_host(self, host_id: int, keep_data: bool = False) -> Dict:
+        """
+        Remove a host from active management
+
+        Args:
+            host_id: ID of the host to remove
+            keep_data: If True, keep host data for potential re-add (detach).
+                      If False, completely forget the host (destructive).
+
+        Returns:
+            Dict with success status and message
+        """
+        result = {
+            'success': False,
+            'host_id': host_id,
+            'action': 'detach' if keep_data else 'forget',
+            'message': ''
+        }
+
+        if host_id not in self.hosts:
+            # Check if it's a detached host being forgotten
+            if host_id in self.detached_hosts and not keep_data:
+                hostname = self.detached_hosts[host_id].get('hostname', 'unknown')
+                del self.detached_hosts[host_id]
+                self._save_config()
+                result['success'] = True
+                result['message'] = f'Detached host {hostname} permanently deleted'
+                print(f"   Permanently deleted detached host: {hostname}")
+                return result
+
+            result['message'] = f'Host {host_id} not found'
+            return result
+
+        host = self.hosts[host_id]
+        hostname = host.get('hostname', 'unknown')
+        host_type = host.get('type', 'remote')
+
+        # Don't allow removing localhost
+        if host_type == 'localhost':
+            result['message'] = 'Cannot remove localhost - it is auto-discovered'
+            return result
+
+        if keep_data:
+            # Detach: move to detached_hosts for potential re-add
+            detached_data = {
+                'hostname': host.get('hostname'),
+                'ip': host.get('ip'),
+                'management_ip': host.get('management_ip'),
+                'vxlan_ip': host.get('vxlan_ip'),
+                'type': host.get('type'),
+                'ssh_user': host.get('ssh_user', 'root'),
+                'ssh_password': host.get('ssh_password'),
+                'ovs_version': host.get('ovs_version'),
+                'detached_at': datetime.now().isoformat(),
+                'last_bridges': [b['name'] for b in host.get('bridges', [])]
+            }
+            self.detached_hosts[host_id] = detached_data
+            del self.hosts[host_id]
+            self._save_config()
+
+            result['success'] = True
+            result['message'] = f'Host {hostname} detached (data preserved)'
+            result['can_reattach'] = True
+            print(f"   Detached host: {hostname} ({host.get('ip')})")
+        else:
+            # Forget: completely remove
+            del self.hosts[host_id]
+            # Also remove from detached if present
+            if host_id in self.detached_hosts:
+                del self.detached_hosts[host_id]
+            self._save_config()
+
+            result['success'] = True
+            result['message'] = f'Host {hostname} permanently removed'
+            print(f"   Permanently removed host: {hostname} ({host.get('ip')})")
+
+        return result
+
+    def reattach_host(self, host_id: int) -> Dict:
+        """
+        Re-attach a previously detached host
+
+        Args:
+            host_id: ID of the detached host to re-attach
+
+        Returns:
+            Dict with success status and host info
+        """
+        result = {
+            'success': False,
+            'host_id': host_id,
+            'message': ''
+        }
+
+        if host_id not in self.detached_hosts:
+            result['message'] = f'Detached host {host_id} not found'
+            return result
+
+        detached = self.detached_hosts[host_id]
+        ip = detached.get('management_ip') or detached.get('ip')
+        username = detached.get('ssh_user', 'root')
+        password = detached.get('ssh_password')
+        vxlan_ip = detached.get('vxlan_ip')
+
+        if not ip or not password:
+            result['message'] = 'Missing credentials for detached host'
+            return result
+
+        print(f"   Re-attaching host {detached.get('hostname', ip)}...")
+
+        # Try to reconnect
+        success = self._reconnect_host(
+            host_id=host_id,
+            ip=ip,
+            username=username,
+            password=password,
+            vxlan_ip=vxlan_ip,
+            saved_hostname=detached.get('hostname')
+        )
+
+        if success:
+            # Remove from detached
+            del self.detached_hosts[host_id]
+            self._save_config()
+
+            result['success'] = True
+            result['message'] = f'Host {detached.get("hostname", ip)} re-attached successfully'
+            result['host'] = self.hosts.get(host_id)
+        else:
+            result['message'] = f'Failed to reconnect to host {ip}'
+
+        return result
+
+    def get_detached_hosts(self) -> List[Dict]:
+        """Get list of detached hosts (without exposing passwords)"""
+        detached_list = []
+        for host_id, host in self.detached_hosts.items():
+            host_copy = {k: v for k, v in host.items() if k != 'ssh_password'}
+            host_copy['id'] = host_id
+            detached_list.append(host_copy)
+        return detached_list
 
     def get_all_switches(self) -> List[Dict]:
         """
