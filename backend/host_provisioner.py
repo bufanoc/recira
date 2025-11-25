@@ -257,6 +257,43 @@ class HostProvisioner:
 
             return success_count > 0
 
+    def enable_stp_on_bridges(self) -> bool:
+        """
+        Enable STP (Spanning Tree Protocol) on all OVS bridges.
+
+        This is CRITICAL for full-mesh VXLAN topologies to prevent
+        broadcast storms and L2 loops.
+
+        Returns:
+            True if successful, False otherwise
+        """
+        print(f"🌲 Enabling STP on bridges (loop prevention)...")
+
+        # Get list of bridges
+        rc, stdout, stderr = self._ssh_exec('ovs-vsctl list-br')
+        if rc != 0:
+            print(f"   ⚠️  Failed to list bridges: {stderr}")
+            return False
+
+        bridges = [br.strip() for br in stdout.split('\n') if br.strip()]
+
+        if not bridges:
+            print(f"   ℹ️  No bridges found")
+            return True
+
+        success = True
+        for bridge in bridges:
+            rc, stdout, stderr = self._ssh_exec(
+                f'ovs-vsctl set bridge {bridge} stp_enable=true'
+            )
+            if rc == 0:
+                print(f"   ✅ STP enabled on {bridge}")
+            else:
+                print(f"   ⚠️  Failed to enable STP on {bridge}: {stderr}")
+                success = False
+
+        return success
+
     def optimize_ovs(self) -> bool:
         """
         Apply OVS optimization settings for production use
@@ -281,6 +318,9 @@ class HostProvisioner:
                 print(f"   ✅ Set {config_key}={config_value}")
             else:
                 print(f"   ⚠️  Failed to set {config_key}: {stderr}")
+
+        # Enable STP on all bridges (critical for loop prevention)
+        self.enable_stp_on_bridges()
 
         return True
 

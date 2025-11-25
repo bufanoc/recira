@@ -1,8 +1,8 @@
 # Recira VXLAN Web Controller - Session Continuity Document
 
 **Date**: 2025-11-25
-**Version**: v0.7.5 - DHCP Cross-Host Fix
-**Status**: DHCP working across all hosts, hosts cleaned up
+**Version**: v0.7.6 - STP Loop Prevention
+**Status**: Full-mesh VXLAN with STP loop prevention, DHCP working
 **GitHub**: https://github.com/bufanoc/recira
 
 ---
@@ -68,7 +68,7 @@
 
 ## Current Session Status (Nov 25)
 
-**Last Updated**: 2025-11-25 ~20:00 UTC
+**Last Updated**: 2025-11-25 ~21:15 UTC
 
 ### What Was Done (Latest Session):
 
@@ -83,11 +83,22 @@
    - VXLAN uses VNI for encapsulation - VLAN tags in bridge broke traffic flow
    - Now gateway ports are untagged; existing configs auto-fixed
 
-3. **Verified DHCP working** across all hosts
+3. **Fixed L2 Broadcast Storm** - Critical!
+   - Full-mesh VXLAN without STP caused broadcast loops
+   - ~24,000 packets/sec looping, 2.8 billion total, 183M drops
+   - IPv6 Neighbor Discovery from deleted dhcp-test was circulating forever
+   - **Solution**: Enabled STP on all bridges
+   - ovs-01 is root bridge, ovs-02's link to ovs-3 is blocking
+   - Traffic now: 0 packets/sec storm (fixed!)
+
+4. **Added STP to Host Provisioner** (permanent fix)
+   - `enable_stp_on_bridges()` method added to host_provisioner.py
+   - STP now enabled automatically during host optimization
+   - All new hosts will have STP enabled by default
+
+5. **Verified DHCP still works** with STP topology
    - ovs-02 got 10.0.0.127 from DHCP server on ovs-01
    - ovs-3 got 10.0.0.109 from DHCP server on ovs-01
-
-4. **Verified underlay connectivity** - 0% packet loss between all hosts
 
 ### Previous Session Work:
 
@@ -268,6 +279,7 @@ dhcp-test cleanup      # Remove test interface
 | v0.7.3 | Nov 25 | Host management, bug fixes |
 | v0.7.4 | Nov 25 | Storage location, API fixes |
 | v0.7.5 | Nov 25 | DHCP cross-host fix, host cleanup |
+| v0.7.6 | Nov 25 | STP loop prevention (critical fix) |
 
 ---
 
@@ -275,7 +287,7 @@ dhcp-test cleanup      # Remove test interface
 
 | Version | Feature | Status |
 |---------|---------|--------|
-| v0.7.5 | DHCP Cross-Host Fix | **Current** |
+| v0.7.6 | STP Loop Prevention | **Current** |
 | v0.8 | Port Management | Next |
 | v1.0 | OpenFlow | Planned |
 | v1.1 | Monitoring | Planned |
@@ -312,14 +324,50 @@ ping -c 4 10.172.88.232
 
 | Commit | Description |
 |--------|-------------|
+| (pending) | Enable STP by default in host provisioner |
+| 3035eb9 | Update session continuity for v0.7.5 |
 | 57b4f51 | Fix DHCP not working across VXLAN tunnels (remove VLAN tags) |
 | 4f29ab8 | Merge session continuity documents |
 | a98ecbf | Move storage from /tmp to /var/lib/recira |
 | 568018d | Fix vxlan_ip missing in /api/hosts response |
-| dc8ce30 | Add host management, fix tunnel deletion |
-| 1a8fed5 | Fix DHCP gateway port VNI tagging |
+
+---
+
+## Troubleshooting
+
+### L2 Broadcast Storm (high CPU, millions of packets)
+```bash
+# Check for storm
+ssh root@<host> 'cat /sys/class/net/br0/statistics/rx_packets; sleep 5; cat /sys/class/net/br0/statistics/rx_packets'
+
+# Enable STP on all bridges (fix)
+ssh root@<host> 'ovs-vsctl set bridge br0 stp_enable=true'
+
+# Verify STP topology
+ssh root@<host> 'ovs-appctl stp/show br0'
+```
+
+### Server won't start (port 8080 in use)
+```bash
+lsof -ti:8080 | xargs kill -9
+python3 backend/server.py
+```
+
+### Can't SSH to VMs
+```bash
+ssh root@192.168.88.194  # Password: Xm9909ona
+```
+
+### VXLAN tunnel not working
+```bash
+# Check VXLAN ports exist
+ssh root@192.168.88.194 'ovs-vsctl list-ports br0'
+
+# Check underlay connectivity
+ping -c 4 10.172.88.232
+```
 
 ---
 
 *End of Session Continuity Document*
-*Last updated: 2025-11-25 ~20:00 UTC*
+*Last updated: 2025-11-25 ~21:15 UTC*
