@@ -3,7 +3,7 @@
 VXLAN Web Controller - Backend Server with Real OVS Discovery
 Repurposed from DVSC for generic OVS/VXLAN management
 
-Version: 0.6.1 - Bug fixes (frontend timing + VXLAN port naming)
+Version: 0.7.0 - DHCP Integration
 """
 
 import http.server
@@ -20,6 +20,7 @@ from ovs_manager import ovs_manager
 import vxlan_manager as vxlan_mgr
 import network_manager as net_mgr
 import host_provisioner as host_prov
+import dhcp_manager as dhcp_mgr
 
 PORT = 8080
 FRONTEND_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'frontend/37734')
@@ -30,6 +31,7 @@ SERVER_START_TIME = datetime.now()
 # Initialize managers
 vxlan_manager = None
 network_manager = None
+dhcp_manager = None
 
 class VXLANRequestHandler(http.server.SimpleHTTPRequestHandler):
     """Custom request handler for VXLAN Web Controller"""
@@ -80,12 +82,13 @@ class VXLANRequestHandler(http.server.SimpleHTTPRequestHandler):
 
             response = {
                 "status": "running",
-                "version": "0.6.1",
+                "version": "0.7.0",
                 "uptime": uptime_str,
                 "controller": "Recira - Virtual Network Platform",
                 "hosts": len(ovs_manager.get_all_hosts()),
                 "switches": len(ovs_manager.get_all_switches()),
-                "networks": len(network_manager.get_all_networks()) if network_manager else 0
+                "networks": len(network_manager.get_all_networks()) if network_manager else 0,
+                "dhcp_enabled": len(dhcp_manager.get_all_dhcp_configs()) if dhcp_manager else 0
             }
 
         elif path == '/api/switches':
@@ -146,9 +149,19 @@ class VXLANRequestHandler(http.server.SimpleHTTPRequestHandler):
                 response = {"tunnels": []}
 
         elif path == '/api/networks':
-            # Get all virtual networks
+            # Get all virtual networks with DHCP status
             if network_manager:
                 networks = network_manager.get_all_networks()
+                # Add DHCP status to each network
+                if dhcp_manager:
+                    for net in networks:
+                        dhcp_config = dhcp_manager.get_dhcp_config(net['id'])
+                        if dhcp_config:
+                            net['dhcp_enabled'] = True
+                            net['dhcp_host'] = dhcp_config.get('host_ip')
+                            net['dhcp_range'] = f"{dhcp_config.get('dhcp_start')} - {dhcp_config.get('dhcp_end')}"
+                        else:
+                            net['dhcp_enabled'] = False
                 response = {"networks": networks}
             else:
                 response = {"networks": []}
@@ -197,6 +210,10 @@ class VXLANRequestHandler(http.server.SimpleHTTPRequestHandler):
             elif not network_manager:
                 response = {"error": "Network manager not initialized"}
             else:
+                # Also disable DHCP if enabled
+                if dhcp_manager and dhcp_manager.get_dhcp_config(int(network_id)):
+                    dhcp_manager.disable_dhcp(int(network_id))
+
                 success = network_manager.delete_network(int(network_id))
 
                 if success:
@@ -209,6 +226,135 @@ class VXLANRequestHandler(http.server.SimpleHTTPRequestHandler):
                         "success": False,
                         "error": "Failed to delete network (network not found?)"
                     }
+
+        # ============ DHCP API Endpoints (v0.7) ============
+
+        elif path == '/api/dhcp/enable' and data:
+            # Enable DHCP for a network
+            network_id = data.get('network_id')
+            host_ip = data.get('host_ip')
+            dhcp_start = data.get('dhcp_start')
+            dhcp_end = data.get('dhcp_end')
+            username = data.get('username')
+            password = data.get('password')
+            dns_servers = data.get('dns_servers')
+            lease_time = data.get('lease_time', '24h')
+
+            if not network_id or not host_ip or not dhcp_start or not dhcp_end:
+                response = {"error": "Missing required fields: network_id, host_ip, dhcp_start, dhcp_end"}
+            elif not dhcp_manager:
+                response = {"error": "DHCP manager not initialized"}
+            else:
+                result = dhcp_manager.enable_dhcp(
+                    network_id=int(network_id),
+                    host_ip=host_ip,
+                    dhcp_start=dhcp_start,
+                    dhcp_end=dhcp_end,
+                    username=username,
+                    password=password,
+                    dns_servers=dns_servers,
+                    lease_time=lease_time
+                )
+                response = result
+
+        elif path == '/api/dhcp/disable' and data:
+            # Disable DHCP for a network
+            network_id = data.get('network_id')
+            username = data.get('username')
+            password = data.get('password')
+
+            if not network_id:
+                response = {"error": "Missing required field: network_id"}
+            elif not dhcp_manager:
+                response = {"error": "DHCP manager not initialized"}
+            else:
+                result = dhcp_manager.disable_dhcp(
+                    network_id=int(network_id),
+                    username=username,
+                    password=password
+                )
+                response = result
+
+        elif path == '/api/dhcp/config' and query:
+            # Get DHCP configuration for a network (GET request)
+            params = parse_qs(query) if isinstance(query, str) else query
+            network_id = params.get('network_id', [None])[0] if isinstance(query, str) else query.get('network_id')
+
+            if not network_id:
+                response = {"error": "Missing required parameter: network_id"}
+            elif not dhcp_manager:
+                response = {"error": "DHCP manager not initialized"}
+            else:
+                config = dhcp_manager.get_dhcp_config(int(network_id))
+                if config:
+                    response = {"success": True, "dhcp_config": config}
+                else:
+                    response = {"success": False, "message": "DHCP not enabled for this network"}
+
+        elif path == '/api/dhcp/leases' and query:
+            # Get DHCP leases for a network (GET request)
+            params = parse_qs(query) if isinstance(query, str) else query
+            network_id = params.get('network_id', [None])[0] if isinstance(query, str) else query.get('network_id')
+            username = params.get('username', [None])[0] if isinstance(query, str) else query.get('username')
+            password = params.get('password', [None])[0] if isinstance(query, str) else query.get('password')
+
+            if not network_id:
+                response = {"error": "Missing required parameter: network_id"}
+            elif not dhcp_manager:
+                response = {"error": "DHCP manager not initialized"}
+            else:
+                result = dhcp_manager.get_dhcp_leases(
+                    network_id=int(network_id),
+                    username=username,
+                    password=password
+                )
+                response = result
+
+        elif path == '/api/dhcp/reservation' and data:
+            # Add DHCP reservation (POST request)
+            network_id = data.get('network_id')
+            mac = data.get('mac')
+            ip = data.get('ip')
+            hostname = data.get('hostname', '')
+            username = data.get('username')
+            password = data.get('password')
+
+            if not network_id or not mac or not ip:
+                response = {"error": "Missing required fields: network_id, mac, ip"}
+            elif not dhcp_manager:
+                response = {"error": "DHCP manager not initialized"}
+            else:
+                result = dhcp_manager.add_reservation(
+                    network_id=int(network_id),
+                    mac=mac,
+                    ip=ip,
+                    hostname=hostname,
+                    username=username,
+                    password=password
+                )
+                response = result
+
+        elif path == '/api/dhcp/reservation/delete' and data:
+            # Delete DHCP reservation (POST request)
+            network_id = data.get('network_id')
+            mac = data.get('mac')
+            username = data.get('username')
+            password = data.get('password')
+
+            if not network_id or not mac:
+                response = {"error": "Missing required fields: network_id, mac"}
+            elif not dhcp_manager:
+                response = {"error": "DHCP manager not initialized"}
+            else:
+                result = dhcp_manager.delete_reservation(
+                    network_id=int(network_id),
+                    mac=mac,
+                    username=username,
+                    password=password
+                )
+                response = result
+
+        # ============ End DHCP API Endpoints ============
 
         elif path == '/api/hosts/add' and data:
             # Add a remote host
@@ -387,10 +533,10 @@ class VXLANRequestHandler(http.server.SimpleHTTPRequestHandler):
 
 def main():
     """Start the web server"""
-    global vxlan_manager, network_manager
+    global vxlan_manager, network_manager, dhcp_manager
 
     print("\n" + "="*60)
-    print("🚀 Recira - Virtual Network Platform v0.6")
+    print("🚀 Recira - Virtual Network Platform v0.7")
     print("="*60)
     print(f"\n📁 Frontend directory: {FRONTEND_DIR}")
 
@@ -418,26 +564,40 @@ def main():
     network_manager = net_mgr.initialize(ovs_manager, vxlan_manager)
     print("   ✅ Network manager ready")
 
+    # Initialize DHCP manager
+    print("\n🖧 Initializing DHCP manager...")
+    dhcp_manager = dhcp_mgr.initialize(ovs_manager, network_manager)
+    print("   ✅ DHCP manager ready")
+
     print(f"\n🌐 Server starting on port {PORT}...")
     print(f"\n✨ Open your browser to: http://localhost:{PORT}")
     print(f"   (or http://192.168.88.164:{PORT} from other machines)")
     print("\n" + "="*60)
-    print("API Endpoints (v0.6 - Host Auto-Provisioning!):")
+    print("API Endpoints (v0.7 - DHCP Integration!):")
     print("  GET  /api/status              - Controller status")
     print("  GET  /api/switches            - Connected switches")
     print("  GET  /api/hosts               - OVS hosts")
     print("  POST /api/hosts/add           - Add remote host")
-    print("  POST /api/hosts/provision     - Auto-provision host with OVS (NEW!)")
-    print("  GET  /api/hosts/health        - Get host health status (NEW!)")
-    print("  GET  /api/networks            - Virtual networks")
+    print("  POST /api/hosts/provision     - Auto-provision host with OVS")
+    print("  GET  /api/hosts/health        - Get host health status")
+    print("  GET  /api/networks            - Virtual networks (with DHCP status)")
     print("  POST /api/networks/create     - Create network with full-mesh")
     print("  POST /api/networks/delete     - Delete network and tunnels")
     print("  GET  /api/tunnels             - VXLAN tunnels")
     print("  POST /api/tunnels/create      - Create VXLAN tunnel")
     print("  POST /api/tunnels/delete      - Delete VXLAN tunnel")
     print("  GET  /api/topology            - Network topology")
+    print("  --- DHCP Endpoints (NEW!) ---")
+    print("  POST /api/dhcp/enable         - Enable DHCP for network")
+    print("  POST /api/dhcp/disable        - Disable DHCP for network")
+    print("  GET  /api/dhcp/config         - Get DHCP configuration")
+    print("  GET  /api/dhcp/leases         - View active DHCP leases")
+    print("  POST /api/dhcp/reservation    - Add DHCP reservation")
+    print("  POST /api/dhcp/reservation/delete - Delete reservation")
     print("="*60 + "\n")
 
+    # Allow port reuse to avoid "Address already in use" errors
+    socketserver.TCPServer.allow_reuse_address = True
     with socketserver.TCPServer(("", PORT), VXLANRequestHandler) as httpd:
         try:
             httpd.serve_forever()

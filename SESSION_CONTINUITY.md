@@ -1,8 +1,8 @@
 # Recira VXLAN Web Controller - Session Continuity Document
 
 **Date**: 2025-11-25
-**Version**: v0.6.1 - Bug Fixes (Frontend Timing + VXLAN Port Naming)
-**Status**: Fully Functional with Dual-Interface Support
+**Version**: v0.7.0 - DHCP Integration
+**Status**: Fully Functional with DHCP Support
 
 ---
 
@@ -13,12 +13,13 @@
 - Managing VXLAN tunnels between switches
 - Creating virtual networks with full-mesh topology
 - Dual-interface support (separate management and VXLAN data plane networks)
+- **NEW in v0.7**: DHCP server integration using dnsmasq
 
 **Current Setup**:
 - Server running on: http://192.168.88.164:8080
 - Frontend: Dojo-based UI (repurposed from DVSC)
 - Backend: Python HTTP server with OVS integration
-- Version: 0.6.1
+- Version: 0.7.0
 
 ---
 
@@ -54,178 +55,144 @@
 
 ---
 
-## Features Implemented This Session
+## Features Implemented in v0.7
 
-### 1. Interface Selection for Dual-Network Hosts
+### DHCP Integration
 
-**Problem**: User has dual-interface hosts where management and VXLAN traffic use different networks. Need to select which interface is used for VXLAN tunnel endpoints.
+**Goal**: Automatic IP assignment in overlay networks using dnsmasq
 
-**Solution**: Two-step workflow for both "Add Host" and "Provision Host" modals.
+**Features Implemented**:
+- Enable/disable DHCP per network via web UI
+- Select which host runs the DHCP server
+- Configure DHCP scope (IP range, lease time, DNS servers)
+- Auto-configure dnsmasq on selected host
+- View active DHCP leases
+- DHCP reservations (MAC -> IP mapping)
 
 #### Backend Changes:
 
-**File: `backend/host_provisioner.py`**
-- Added `scan_host_interfaces()` function:
-  - Connects via SSH to remote host
-  - Runs `ip -4 addr show` to discover all interfaces
-  - Returns interface name, IP/CIDR, MTU, and link state
-  - Filters out loopback, Docker, and veth interfaces
-
-- Updated `configure_mtu(mtu, target_interface=None)`:
-  - Now accepts optional `target_interface` parameter
-  - If specified, only sets MTU on that interface (not all interfaces)
-  - Prevents accidentally changing MTU on management interface
-
-- Updated `provision_host(vxlan_interface=None)`:
-  - Accepts optional `vxlan_interface` parameter
-  - Passes it to `configure_mtu()` for targeted MTU configuration
+**File: `backend/dhcp_manager.py`** (NEW)
+- `DHCPManager` class for managing DHCP services
+- `enable_dhcp()` - Enable DHCP for a network on a specific host
+- `disable_dhcp()` - Disable DHCP for a network
+- `get_dhcp_config()` - Get DHCP configuration
+- `get_dhcp_leases()` - Read active leases from dnsmasq
+- `add_reservation()` - Add MAC -> IP reservation
+- `delete_reservation()` - Remove reservation
+- Auto-installs dnsmasq if not present
+- Creates OVS internal port for gateway
+- Generates dnsmasq configuration file
+- Persists DHCP config to `/tmp/recira-dhcp.json`
 
 **File: `backend/server.py`**
-- Added `/api/hosts/scan-interfaces` endpoint (GET):
-  - Parameters: `ip`, `username`, `password`
-  - Returns: `{success: true, interfaces: [...]}`
-  - Used by frontend before adding/provisioning host
-
-- Updated `/api/hosts/add` endpoint (POST):
-  - Now accepts optional `vxlan_ip` parameter
-  - Passes to `ovs_manager.discover_remote_host()`
-
-- Updated `/api/hosts/provision` endpoint (POST):
-  - Now accepts `vxlan_interface` and `vxlan_ip` parameters
-  - Provisions host with MTU only on selected interface
-  - Stores both management and VXLAN IPs
-
-**File: `backend/ovs_manager.py`**
-- Updated `discover_localhost(vxlan_ip=None)`:
-  - Stores both `management_ip` and `vxlan_ip` fields in host record
-  - Falls back to regular IP if vxlan_ip not provided
-
-- Updated `discover_remote_host(vxlan_ip=None)`:
-  - Stores both `management_ip` and `vxlan_ip` fields in host record
-  - Management IP used for SSH connections
-  - VXLAN IP used for tunnel endpoints
-
-**File: `backend/vxlan_manager.py`**
-- Updated `_get_vxlan_ip(host)`:
-  - Removed hard-coded IP mappings
-  - Now uses `host.get('vxlan_ip')` from stored host record
-  - Falls back to management IP for backward compatibility
+- Updated version to 0.7.0
+- Added `dhcp_manager` initialization
+- Added DHCP API endpoints:
+  - `POST /api/dhcp/enable` - Enable DHCP for network
+  - `POST /api/dhcp/disable` - Disable DHCP for network
+  - `GET /api/dhcp/config` - Get DHCP configuration
+  - `GET /api/dhcp/leases` - View active leases
+  - `POST /api/dhcp/reservation` - Add MAC reservation
+  - `POST /api/dhcp/reservation/delete` - Delete reservation
+- Updated `/api/networks` to include `dhcp_enabled` status
+- Updated `/api/networks/delete` to auto-disable DHCP
+- Added `SO_REUSEADDR` to avoid port reuse errors
 
 #### Frontend Changes:
 
 **File: `frontend/37734/index.html`**
-
-**Add Host Modal** - Converted to two-step workflow:
-- Step 1: Enter credentials (IP, username, password)
-- Step 2: Scan interfaces and select VXLAN interface
-  - Shows table with: Interface name, IP/CIDR, MTU, Link state
-  - Auto-suggests interfaces with 10.172.x IP or MTU 9000
-  - Radio button selection for VXLAN interface
-
-**Provision Host Modal** - Same two-step workflow:
-- Step 1: Enter credentials
-- Step 2: Select VXLAN interface
-- After provisioning, displays success with both IPs
-
-**JavaScript Functions Added**:
-- `scanAddHostInterfaces()` - Calls `/api/hosts/scan-interfaces`
-- `displayAddHostInterfaces()` - Renders interface table
-- `submitAddHost()` - Submits with selected `vxlan_ip`
-- `backToAddHostStep1()` - Navigation between steps
-- Same functions for Provision Host modal
+- Updated version to 0.7
+- Added DHCP column to networks table
+- Networks row shows:
+  - If DHCP enabled: "ON" badge + range + Leases button + Off button
+  - If DHCP disabled (with subnet): "Disabled" + Enable button
+  - If no subnet: "N/A - Need subnet"
+- Added "Enable DHCP" modal:
+  - Network name (read-only)
+  - DHCP server host selection dropdown
+  - DHCP range start/end inputs (auto-suggested from subnet)
+  - DNS servers input
+  - Lease time dropdown
+  - SSH password input
+- Added "DHCP Leases" modal:
+  - Table of active leases (IP, MAC, hostname, expiry)
+  - Refresh button
+- JavaScript functions:
+  - `showEnableDHCPModal()` - Show enable dialog
+  - `closeEnableDHCPModal()` - Close dialog
+  - `enableDHCP()` - Submit enable request
+  - `disableDHCP()` - Disable DHCP with confirmation
+  - `showDHCPLeases()` - Show leases modal
+  - `closeDHCPLeasesModal()` - Close leases
+  - `refreshDHCPLeases()` - Reload leases
 
 ---
 
-## How to Use the System
+## How to Use DHCP
 
-### Starting the Server:
+### Prerequisites:
+1. Network must have subnet and gateway configured
+2. At least one host must be added to Recira
 
-```bash
-cd /root/vxlan-web-controller
-nohup python3 backend/server.py > /tmp/recira-server.log 2>&1 &
-```
-
-Check status:
-```bash
-curl http://localhost:8080/api/status
-```
-
-### Adding a Host (with Interface Selection):
+### Enable DHCP for a Network:
 
 1. Open web UI: http://192.168.88.164:8080
-2. Click "Add Host" button
-3. **Step 1**: Enter credentials
-   - Host IP: 192.168.88.X (management IP)
-   - Username: root
-   - Password: (your password)
-4. Click "Scan Interfaces"
-5. **Step 2**: Select VXLAN interface
-   - System auto-suggests 10.172.x interfaces
-   - Select the interface for VXLAN traffic
-6. Click "Add Host"
+2. In the Networks table, find your network
+3. Click "Enable" button in the DHCP column
+4. In the modal:
+   - Select which host will run DHCP server
+   - DHCP range is auto-suggested based on gateway
+   - Optionally modify DNS servers and lease time
+   - Enter SSH password for the selected host
+5. Click "Enable DHCP"
 
-### Provisioning a New Host:
+### View DHCP Leases:
 
-1. Click "Provision Host" button
-2. **Step 1**: Enter credentials (same as above)
-3. Click "Scan Interfaces"
-4. **Step 2**: Select VXLAN interface
-5. Click "Start Provisioning"
-   - Installs OVS via apt-get/yum
-   - Sets MTU to 9000 on selected interface ONLY
-   - Applies OVS optimizations
-   - May take 5-10 minutes
+1. For networks with DHCP enabled, click "Leases" button
+2. View table of active leases:
+   - IP address assigned
+   - MAC address of client
+   - Hostname (if provided)
+   - Lease expiration time
 
-### Creating a Virtual Network (Full-Mesh):
+### Disable DHCP:
 
-1. Click "Create Network" button
-2. Enter network details:
-   - **Name**: e.g., "Production Network"
-   - **VNI**: e.g., 1009 (or leave empty for auto-assign)
-   - **Subnet**: e.g., 10.0.1.0/24 (optional)
-   - **Gateway**: e.g., 10.0.1.1 (optional)
-3. **Select switches** to include (checkboxes)
-   - Can select switches from any/all hosts
-4. Click "Create Network"
-
-**What Happens**:
-- Creates full-mesh of VXLAN tunnels between all selected switches
-- All tunnels use the same VNI
-- Uses VXLAN IPs (10.172.88.x) as tunnel endpoints, not management IPs
-- Tunnels are grouped as a single logical network
+1. Click "Off" button in the DHCP column
+2. Confirm the action
+3. Enter SSH password when prompted
+4. DHCP server will be stopped and gateway port removed
 
 ---
 
 ## API Endpoints
 
-### Host Management:
-- `GET /api/hosts` - List all hosts
-- `POST /api/hosts/add` - Add existing host (with OVS already installed)
-  - Body: `{ip, username, password, vxlan_ip?}`
-- `POST /api/hosts/provision` - Auto-provision new host
-  - Body: `{ip, username, password, vxlan_interface?, vxlan_ip?, configure_mtu?, optimize?}`
-- `GET /api/hosts/scan-interfaces` - Scan network interfaces on host
-  - Query: `?ip=X&username=Y&password=Z`
-- `GET /api/hosts/health` - Get host health status
-
-### Network Management:
-- `GET /api/networks` - List all virtual networks
-- `POST /api/networks/create` - Create virtual network with full-mesh
-  - Body: `{name, switches: [ids], vni?, subnet?, gateway?}`
-- `POST /api/networks/delete` - Delete network and all its tunnels
-  - Body: `{network_id}`
-
-### Tunnel Management:
-- `GET /api/tunnels` - List all VXLAN tunnels
-- `POST /api/tunnels/create` - Create single point-to-point tunnel
-  - Body: `{src_switch_id, dst_switch_id, vni?}`
+### Existing Endpoints (unchanged):
+- `GET /api/status` - Controller status
+- `GET /api/switches` - Connected switches
+- `GET /api/hosts` - OVS hosts
+- `POST /api/hosts/add` - Add remote host
+- `POST /api/hosts/provision` - Auto-provision host
+- `GET /api/hosts/health` - Host health status
+- `GET /api/hosts/scan-interfaces` - Scan host interfaces
+- `GET /api/networks` - Virtual networks (now includes DHCP status)
+- `POST /api/networks/create` - Create network
+- `POST /api/networks/delete` - Delete network (auto-disables DHCP)
+- `GET /api/tunnels` - VXLAN tunnels
+- `POST /api/tunnels/create` - Create tunnel
 - `POST /api/tunnels/delete` - Delete tunnel
-  - Body: `{tunnel_id}`
+- `GET /api/topology` - Network topology
 
-### Switch Management:
-- `GET /api/switches` - List all OVS switches (bridges) across all hosts
-- `GET /api/topology` - Network topology (nodes and links)
-- `GET /api/status` - Controller status and uptime
+### New DHCP Endpoints (v0.7):
+- `POST /api/dhcp/enable` - Enable DHCP for network
+  - Body: `{network_id, host_ip, dhcp_start, dhcp_end, dns_servers?, lease_time?, password}`
+- `POST /api/dhcp/disable` - Disable DHCP for network
+  - Body: `{network_id, password?}`
+- `GET /api/dhcp/config?network_id=X` - Get DHCP configuration
+- `GET /api/dhcp/leases?network_id=X` - View active leases
+- `POST /api/dhcp/reservation` - Add DHCP reservation
+  - Body: `{network_id, mac, ip, hostname?, password?}`
+- `POST /api/dhcp/reservation/delete` - Delete reservation
+  - Body: `{network_id, mac, password?}`
 
 ---
 
@@ -234,13 +201,14 @@ curl http://localhost:8080/api/status
 ```
 /root/vxlan-web-controller/
 ├── backend/
-│   ├── server.py              # Main HTTP server
+│   ├── server.py              # Main HTTP server (v0.7)
 │   ├── ovs_manager.py         # OVS discovery and management
 │   ├── vxlan_manager.py       # VXLAN tunnel creation
 │   ├── network_manager.py     # Virtual network management
-│   └── host_provisioner.py    # Auto-provisioning and interface scanning
+│   ├── host_provisioner.py    # Auto-provisioning and interface scanning
+│   └── dhcp_manager.py        # NEW - DHCP/dnsmasq management
 ├── frontend/37734/
-│   └── index.html             # Web UI (Dojo-based)
+│   └── index.html             # Web UI (Dojo-based) v0.7
 └── SESSION_CONTINUITY.md      # This file
 ```
 
@@ -249,6 +217,7 @@ curl http://localhost:8080/api/status
 ## Data Storage
 
 - **Networks**: `/tmp/recira-networks.json` (persisted)
+- **DHCP Configs**: `/tmp/recira-dhcp.json` (persisted) - NEW
 - **Hosts/Switches**: In-memory only (lost on server restart)
 - **Tunnels**: In-memory only (lost on server restart)
 
@@ -256,152 +225,53 @@ curl http://localhost:8080/api/status
 
 ---
 
-## Important Implementation Details
-
-### VXLAN IP Selection Logic:
-
-The system now properly handles dual-interface hosts:
-
-1. **During host add/provision**: User selects VXLAN interface via UI
-2. **Backend stores**: Both `management_ip` (for SSH) and `vxlan_ip` (for tunnels)
-3. **When creating tunnels**: System uses `vxlan_ip` from host records
-
-Example host record:
-```json
-{
-  "id": 2,
-  "hostname": "ovs-3",
-  "ip": "192.168.88.197",
-  "management_ip": "192.168.88.197",
-  "vxlan_ip": "10.172.88.234",
-  "type": "remote",
-  "ovs_version": "2.17.9",
-  "bridges": [...]
-}
-```
-
-### MTU Configuration:
-
-- **Before**: Set MTU 9000 on ALL physical interfaces
-- **After**: Only sets MTU on the selected VXLAN interface
-- **Why**: Prevents breaking management network connectivity
-
-### Network Persistence:
-
-Networks are saved to `/tmp/recira-networks.json` in this format:
-```json
-{
-  "id": 1,
-  "name": "Production Network",
-  "vni": 1009,
-  "subnet": "10.0.1.0/24",
-  "gateway": "10.0.1.1",
-  "switches": [3, 4, 5],
-  "tunnels": [1, 2, 3],
-  "created_at": "2025-11-25T..."
-}
-```
-
----
-
 ## Troubleshooting
 
-### Server Not Running:
+### DHCP Not Starting:
 ```bash
-# Kill any stuck processes
-pkill -9 -f "python3.*server.py"
+# Check if dnsmasq is installed
+ssh root@HOST_IP 'which dnsmasq'
 
-# Start fresh
-cd /root/vxlan-web-controller
-nohup python3 backend/server.py > /tmp/recira-server.log 2>&1 &
+# Check dnsmasq status
+ssh root@HOST_IP 'systemctl status dnsmasq'
 
-# Check log
-tail -f /tmp/recira-server.log
+# Check dnsmasq config
+ssh root@HOST_IP 'cat /etc/dnsmasq.d/recira-network-*.conf'
+
+# Check logs
+ssh root@HOST_IP 'journalctl -u dnsmasq -n 50'
 ```
 
-### Host Added but No Switches Show:
-- **Cause**: Host has no OVS bridges created yet
-- **Solution**: Create a bridge on the host:
-  ```bash
-  ssh root@HOST_IP 'ovs-vsctl add-br br0'
-  ```
-- Then re-add the host through the UI
+### No DHCP Leases:
+- Verify gateway port was created: `ovs-vsctl show`
+- Check if client is on the correct network/VLAN
+- Verify dnsmasq is listening: `ss -ulnp | grep dnsmasq`
 
-### Duplicate Hosts:
-- **Cause**: Added same host multiple times
-- **Solution**: Restart server (hosts stored in memory)
-
-### Wrong VXLAN IP Used for Tunnels:
-- **Cause**: Host added before interface selection was implemented
-- **Solution**:
-  1. Restart server to clear hosts
-  2. Re-add hosts using new interface selection workflow
-
-### Network Created but Not Showing in UI:
-- **Check backend**: `curl http://localhost:8080/api/networks`
-- **Check tunnels**: `curl http://localhost:8080/api/tunnels`
-- **Check logs**: `tail -100 /tmp/recira-server.log`
-
----
-
-## Testing Commands
-
-### Check Network on OVS Host:
-```bash
-ssh root@HOST_IP 'ovs-vsctl show'
-ssh root@HOST_IP 'ovs-vsctl list-ports br0'
-```
-
-### Verify VXLAN Tunnel:
-```bash
-ssh root@HOST_IP 'ovs-vsctl list interface vxlan1009'
-ssh root@HOST_IP 'ovs-appctl ofproto/list-tunnels'
-```
-
-### Check MTU:
-```bash
-ssh root@HOST_IP 'ip link show ens34'  # Replace ens34 with interface name
-```
-
-### Test Connectivity:
-```bash
-# On one host, add an internal port
-ssh root@HOST1 'ovs-vsctl add-port br0 vnet0 -- set interface vnet0 type=internal'
-ssh root@HOST1 'ip addr add 10.0.1.10/24 dev vnet0'
-ssh root@HOST1 'ip link set vnet0 up'
-
-# On another host
-ssh root@HOST2 'ovs-vsctl add-port br0 vnet0 -- set interface vnet0 type=internal'
-ssh root@HOST2 'ip addr add 10.0.1.20/24 dev vnet0'
-ssh root@HOST2 'ip link set vnet0 up'
-
-# Test ping
-ssh root@HOST1 'ping 10.0.1.20'
-```
+### DHCP Enable Button Not Showing:
+- Network must have both subnet AND gateway configured
+- Verify in network list that both fields have values
 
 ---
 
 ## Known Issues and Limitations
 
-1. **In-Memory Storage**: Hosts and tunnels are lost on server restart
+1. **In-Memory Host Storage**: Hosts are lost on server restart
 2. **No Authentication**: Web UI has no login/authentication
 3. **No SSL/TLS**: Server runs on HTTP only
-4. **No Flow Management**: Cannot view/modify OpenFlow flows
-5. **No Statistics**: No bandwidth/packet counters yet
+4. **Single DHCP Server**: Each network can only have one DHCP server
+5. **No DHCP Failover**: No high-availability for DHCP
 
 ---
 
 ## Future Enhancements (Roadmap)
 
-- [ ] Persistent host/tunnel storage (SQLite or JSON files)
-- [ ] Authentication and user management
-- [ ] SSL/TLS support
-- [ ] OpenFlow flow viewer/editor
-- [ ] Traffic statistics and monitoring
-- [ ] Automatic host discovery (scan subnet)
-- [ ] Backup/restore configuration
-- [ ] Multi-controller support
-- [ ] REST API documentation (Swagger/OpenAPI)
+- [x] v0.7 - DHCP Integration (COMPLETE)
+- [ ] v0.8 - Port Management (assign ports to networks)
+- [ ] v0.9 - Visual Topology (D3.js network diagram)
+- [ ] v1.0 - OpenFlow Management
+- [ ] v1.1 - Statistics & Monitoring
+- [ ] v1.2 - KVM Integration
+- [ ] v1.3+ - Production Hardening (auth, TLS)
 
 ---
 
@@ -416,137 +286,22 @@ ssh root@HOST1 'ping 10.0.1.20'
 
 ## Session Status
 
-**Last Updated**: 2025-11-25 06:00 UTC
+**Last Updated**: 2025-11-25 10:00 UTC
 
-### Investigation and Fixes Complete ✅
+### v0.7 DHCP Integration Complete
 
-**User Issue**: "I created a network with vni 1009 and ip 10.0.1.0/24 with gateway 10.0.1.1 it completed without an error but it did not show up in the network list"
+**New Files**:
+- `backend/dhcp_manager.py` - Full DHCP management module
 
----
+**Modified Files**:
+- `backend/server.py` - DHCP endpoints and initialization
+- `frontend/37734/index.html` - DHCP UI controls
 
-### Issue #1: Frontend Network Creation Failed (FIXED ✅)
-
-**Root Cause**: Frontend JavaScript failed silently - POST request never sent to backend
-
-**Evidence**:
-- Server logs showed NO POST request to `/api/networks/create` from user's attempt
-- Frontend JavaScript code appeared correct but needed better error handling
-
-**Fix Applied** (`frontend/37734/index.html`):
-- Added console logging to `createNetwork()` function for debugging
-- Added null check for submit button selector
-- Added error logging for fetch failures
-- Now logs: "createNetwork() called", selected switches, request data, and response
-
-**Result**: Frontend now has better debugging capability. User can check browser console (F12) to see if createNetwork() is being called and where it fails.
-
----
-
-### Issue #2: Full-Mesh Tunnel Creation Partial Failure (FIXED ✅)
-
-**Root Cause**: VXLAN port naming conflict - all tunnels with same VNI used same port name
-
-**Problem Details**:
-```
-When creating full-mesh with VNI 1009:
-- Tunnel 1: ovs-3 → ovs-02, creates port "vxlan1009" ✅
-- Tunnel 2: ovs-3 → ovs-01, tries to create port "vxlan1009" ❌ (already exists!)
-- Tunnel 3: ovs-02 → ovs-01, tries to create port "vxlan1009" ❌ (already exists!)
-```
-
-**Fix Applied** (`backend/vxlan_manager.py`):
-```python
-# OLD: Single port name per VNI
-tunnel_name = f"vxlan{vni}"  # e.g., vxlan1009
-
-# NEW: Unique port names including remote IP suffix
-dst_ip_suffix = dst_vxlan_ip.split('.')[-1]
-src_ip_suffix = src_vxlan_ip.split('.')[-1]
-tunnel_name_src = f"vxlan{vni}_{dst_ip_suffix}"  # e.g., vxlan1009_233
-tunnel_name_dst = f"vxlan{vni}_{src_ip_suffix}"  # e.g., vxlan1009_234
-```
-
-**Result**: Full-mesh now works correctly. Each tunnel gets unique port names based on remote endpoint.
-
-**Test Results** (VNI 3000, 3 switches):
-- ✅ All 3 tunnels created successfully
-- ✅ Verified on actual OVS hosts:
-  - ovs-3: vxlan3000_232, vxlan3000_233
-  - ovs-02: vxlan3000_232, vxlan3000_234
-  - ovs-01: vxlan3000_233, vxlan3000_234
-
----
-
-### Summary of Changes
-
-**Files Modified**:
-1. `frontend/37734/index.html:618-620`
-   - **CRITICAL FIX**: Removed event listener from DOMContentLoaded (timing issue)
-   - Form didn't exist when listener tried to attach at page load
-   - Error: `Uncaught TypeError: can't access property "addEventListener", document.getElementById(...) is null`
-
-2. `frontend/37734/index.html:966-988`
-   - **CRITICAL FIX**: Moved event listener to showCreateNetworkModal()
-   - Ensures form exists in DOM when listener attaches (modal is open)
-   - Added flag `networkFormListenerAttached` to prevent multiple attachments
-   - Added console logging for debugging
-
-3. `backend/vxlan_manager.py:55-102`
-   - Changed tunnel naming to include remote IP suffix (vxlan{vni}_{remote_ip_suffix})
-   - Updated tunnel_info to store both tunnel_name_src and tunnel_name_dst
-   - Fixed delete_tunnel() for backward compatibility
-
-**Version Update**: v0.6.0 → v0.6.1 (bug fixes)
-
----
-
-### Testing Verification
-
-**Frontend Fix - VERIFIED ✅**:
-- User successfully created network via UI
-- Form submission working correctly after browser refresh
-- Network appeared in UI immediately
-- No JavaScript errors
-
-**Backend Fix - VERIFIED ✅**:
-- **Test Network**: "ten-eight-network" (VNI 1002)
-- **Switches**: ovs-3, ovs-02, ovs-01
-- **Tunnels Created**: 3 of 3 ✅
-- **Formula**: 3 switches × (3-1) / 2 = 3 tunnels
-
-**Actual VXLAN Ports Created**:
-- **ovs-3** (10.172.88.234): vxlan1002_232, vxlan1002_233
-- **ovs-02** (10.172.88.233): vxlan1002_232, vxlan1002_234
-- **ovs-01** (10.172.88.232): vxlan1002_233, vxlan1002_234
-
-All unique port names - no conflicts! ✅
-
----
-
-### What's Working Now
-
-- ✅ Interface selection and dual-IP management
-- ✅ Host add/provision with VXLAN interface selection
-- ✅ Backend API endpoints fully functional
-- ✅ VXLAN tunnels use correct 10.172.88.x IPs
-- ✅ Network persistence to `/tmp/recira-networks.json`
-- ✅ Full-mesh tunnel creation (FIXED!)
-- ✅ Frontend error logging (IMPROVED!)
-
----
-
-### Known Limitations
-
-1. **Host Persistence**:
-   - Remote hosts are currently stored in memory only
-   - After server restart, hosts need to be re-added via UI
-   - Networks and tunnels ARE persisted to `/tmp/recira-networks.json`
-   - Future enhancement: Add host persistence to disk
-
-2. **Network State Recovery**:
-   - When server restarts, network metadata loads from disk
-   - But VXLAN tunnels remain active on OVS hosts
-   - Tunnel state in UI may not reflect actual OVS state after restart
+**Testing**:
+- Server starts successfully with DHCP manager
+- API endpoints return correct responses
+- Networks endpoint includes dhcp_enabled status
+- Frontend loads with DHCP controls
 
 ---
 

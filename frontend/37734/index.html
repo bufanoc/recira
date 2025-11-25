@@ -242,13 +242,13 @@
     <div id="loading">
         <div style="font-size: 48px; margin-bottom: 20px;">🚀</div>
         <div>Loading Recira...</div>
-        <div style="font-size: 14px; margin-top: 10px; color: #7f8c8d;">v0.6 - Host Auto-Provisioning</div>
+        <div style="font-size: 14px; margin-top: 10px; color: #7f8c8d;">v0.7 - DHCP Integration</div>
     </div>
 
     <div id="app-container">
         <div class="header">
             <h1>🌐 Recira - Virtual Network Platform</h1>
-            <div class="subtitle">Open Source SDN Platform for VXLAN Overlay Networks • v0.6</div>
+            <div class="subtitle">Open Source SDN Platform for VXLAN Overlay Networks • v0.7</div>
         </div>
 
         <div class="content">
@@ -338,13 +338,14 @@
                             <th>VNI</th>
                             <th>Subnet</th>
                             <th>Gateway</th>
+                            <th>DHCP</th>
                             <th>Switches</th>
                             <th>Tunnels</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody id="networks-body">
-                        <tr><td colspan="8" style="text-align: center;">Loading...</td></tr>
+                        <tr><td colspan="9" style="text-align: center;">Loading...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -565,9 +566,78 @@
         </div>
     </div>
 
+    <!-- Enable DHCP Modal -->
+    <div id="enableDHCPModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">🖧 Enable DHCP for Network</div>
+            <form id="dhcpForm">
+                <input type="hidden" id="dhcpNetworkId">
+                <div class="form-group">
+                    <label>Network</label>
+                    <input type="text" id="dhcpNetworkName" readonly style="background: #f0f0f0;">
+                </div>
+                <div class="form-group">
+                    <label>DHCP Server Host (select which host runs dnsmasq)</label>
+                    <select id="dhcpHostSelect" required>
+                        <option value="">Select host...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>DHCP Range Start</label>
+                    <input type="text" id="dhcpStart" placeholder="10.0.1.10" required>
+                </div>
+                <div class="form-group">
+                    <label>DHCP Range End</label>
+                    <input type="text" id="dhcpEnd" placeholder="10.0.1.250" required>
+                </div>
+                <div class="form-group">
+                    <label>DNS Servers (comma-separated)</label>
+                    <input type="text" id="dhcpDNS" value="8.8.8.8, 8.8.4.4">
+                </div>
+                <div class="form-group">
+                    <label>Lease Time</label>
+                    <select id="dhcpLeaseTime">
+                        <option value="1h">1 hour</option>
+                        <option value="6h">6 hours</option>
+                        <option value="12h">12 hours</option>
+                        <option value="24h" selected>24 hours</option>
+                        <option value="48h">48 hours</option>
+                        <option value="168h">1 week</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>SSH Password (for DHCP host)</label>
+                    <input type="password" id="dhcpPassword" placeholder="SSH password for selected host" required>
+                </div>
+                <div style="margin-bottom: 15px; padding: 10px; background: #fef9e7; border-radius: 4px; font-size: 13px;">
+                    <strong>Note:</strong> This will install dnsmasq (if needed), create a gateway port on OVS, and start DHCP service on the selected host.
+                </div>
+                <div>
+                    <button type="submit" class="btn-primary">Enable DHCP</button>
+                    <button type="button" class="btn-secondary" onclick="closeEnableDHCPModal()">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- DHCP Leases Modal -->
+    <div id="dhcpLeasesModal" class="modal">
+        <div class="modal-content" style="width: 600px;">
+            <div class="modal-header">📋 DHCP Leases</div>
+            <div id="dhcpLeasesContent">
+                <p style="text-align: center; color: #7f8c8d;">Loading leases...</p>
+            </div>
+            <div style="margin-top: 20px;">
+                <button type="button" class="btn" onclick="refreshDHCPLeases()">🔄 Refresh</button>
+                <button type="button" class="btn-secondary" onclick="closeDHCPLeasesModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         // Global switches array
         let allSwitches = [];
+        let currentDHCPNetworkId = null;
 
         // Hide loading, show app
         setTimeout(function() {
@@ -1107,6 +1177,191 @@
             });
         }
 
+        // ============ DHCP Functions (v0.7) ============
+
+        function showEnableDHCPModal(networkId, networkName, subnet, gateway) {
+            currentDHCPNetworkId = networkId;
+            document.getElementById('dhcpNetworkId').value = networkId;
+            document.getElementById('dhcpNetworkName').value = networkName + ' (VNI ' + networkId + ')';
+
+            // Parse subnet to suggest DHCP range
+            if (subnet && gateway) {
+                const parts = gateway.split('.');
+                if (parts.length === 4) {
+                    const base = parts.slice(0, 3).join('.');
+                    document.getElementById('dhcpStart').value = base + '.10';
+                    document.getElementById('dhcpEnd').value = base + '.250';
+                }
+            }
+
+            // Populate host dropdown
+            fetch('/api/hosts')
+                .then(r => r.json())
+                .then(data => {
+                    const select = document.getElementById('dhcpHostSelect');
+                    select.innerHTML = '<option value="">Select host...</option>';
+                    data.hosts.forEach(host => {
+                        const option = document.createElement('option');
+                        option.value = host.ip;
+                        option.textContent = `${host.hostname} (${host.ip})`;
+                        select.appendChild(option);
+                    });
+                });
+
+            document.getElementById('enableDHCPModal').style.display = 'block';
+        }
+
+        function closeEnableDHCPModal() {
+            document.getElementById('enableDHCPModal').style.display = 'none';
+            document.getElementById('dhcpForm').reset();
+        }
+
+        // Handle DHCP form submission
+        document.addEventListener('DOMContentLoaded', function() {
+            const dhcpForm = document.getElementById('dhcpForm');
+            if (dhcpForm) {
+                dhcpForm.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    enableDHCP();
+                });
+            }
+        });
+
+        function enableDHCP() {
+            const networkId = document.getElementById('dhcpNetworkId').value;
+            const hostIp = document.getElementById('dhcpHostSelect').value;
+            const dhcpStart = document.getElementById('dhcpStart').value;
+            const dhcpEnd = document.getElementById('dhcpEnd').value;
+            const dnsServers = document.getElementById('dhcpDNS').value.split(',').map(s => s.trim());
+            const leaseTime = document.getElementById('dhcpLeaseTime').value;
+            const password = document.getElementById('dhcpPassword').value;
+
+            if (!hostIp || !dhcpStart || !dhcpEnd || !password) {
+                alert('Please fill in all required fields');
+                return;
+            }
+
+            const submitBtn = document.querySelector('#dhcpForm button[type="submit"]');
+            const originalText = submitBtn.textContent;
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Enabling DHCP...';
+
+            fetch('/api/dhcp/enable', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    network_id: networkId,
+                    host_ip: hostIp,
+                    dhcp_start: dhcpStart,
+                    dhcp_end: dhcpEnd,
+                    dns_servers: dnsServers,
+                    lease_time: leaseTime,
+                    password: password
+                })
+            })
+            .then(r => r.json())
+            .then(response => {
+                submitBtn.disabled = false;
+                submitBtn.textContent = originalText;
+
+                if (response.success) {
+                    alert('DHCP enabled successfully!\n\nDHCP Range: ' + dhcpStart + ' - ' + dhcpEnd);
+                    closeEnableDHCPModal();
+                    loadData();
+                } else {
+                    alert('Error enabling DHCP: ' + (response.message || response.error || 'Unknown error'));
+                }
+            })
+            .catch(e => {
+                console.error('DHCP enable error:', e);
+                submitBtn.disabled = false;
+                submitBtn.textContent = originalText;
+                alert('Failed to enable DHCP: ' + e);
+            });
+        }
+
+        function disableDHCP(networkId) {
+            if (!confirm('Are you sure you want to disable DHCP for this network?')) {
+                return;
+            }
+
+            const password = prompt('Enter SSH password for DHCP host:');
+            if (!password) return;
+
+            fetch('/api/dhcp/disable', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    network_id: networkId,
+                    password: password
+                })
+            })
+            .then(r => r.json())
+            .then(response => {
+                if (response.success) {
+                    alert('DHCP disabled successfully!');
+                    loadData();
+                } else {
+                    alert('Error disabling DHCP: ' + (response.message || response.error || 'Unknown error'));
+                }
+            })
+            .catch(e => {
+                alert('Failed to disable DHCP: ' + e);
+            });
+        }
+
+        function showDHCPLeases(networkId) {
+            currentDHCPNetworkId = networkId;
+            document.getElementById('dhcpLeasesModal').style.display = 'block';
+            refreshDHCPLeases();
+        }
+
+        function closeDHCPLeasesModal() {
+            document.getElementById('dhcpLeasesModal').style.display = 'none';
+            currentDHCPNetworkId = null;
+        }
+
+        function refreshDHCPLeases() {
+            if (!currentDHCPNetworkId) return;
+
+            document.getElementById('dhcpLeasesContent').innerHTML =
+                '<p style="text-align: center; color: #7f8c8d;">Loading leases...</p>';
+
+            fetch('/api/dhcp/leases?network_id=' + currentDHCPNetworkId)
+                .then(r => r.json())
+                .then(response => {
+                    if (response.success) {
+                        if (response.leases.length === 0) {
+                            document.getElementById('dhcpLeasesContent').innerHTML =
+                                '<p style="text-align: center; color: #7f8c8d;">No active leases</p>';
+                        } else {
+                            let html = '<table style="width: 100%; font-size: 13px;">';
+                            html += '<thead><tr><th>IP Address</th><th>MAC Address</th><th>Hostname</th><th>Expires</th></tr></thead>';
+                            html += '<tbody>';
+                            response.leases.forEach(lease => {
+                                html += `<tr>
+                                    <td>${lease.ip}</td>
+                                    <td><code style="font-size: 11px;">${lease.mac}</code></td>
+                                    <td>${lease.hostname || '-'}</td>
+                                    <td>${lease.expires_at || '-'}</td>
+                                </tr>`;
+                            });
+                            html += '</tbody></table>';
+                            document.getElementById('dhcpLeasesContent').innerHTML = html;
+                        }
+                    } else {
+                        document.getElementById('dhcpLeasesContent').innerHTML =
+                            '<p style="color: red;">Error: ' + (response.message || response.error) + '</p>';
+                    }
+                })
+                .catch(e => {
+                    document.getElementById('dhcpLeasesContent').innerHTML =
+                        '<p style="color: red;">Failed to load leases: ' + e + '</p>';
+                });
+        }
+
+        // ============ End DHCP Functions ============
+
         // Load data from APIs
         function loadData() {
             // Load switches
@@ -1181,15 +1436,34 @@
 
                     let html = '';
                     if (data.networks.length === 0) {
-                        html = '<tr><td colspan="8" style="text-align: center; color: #7f8c8d;">No networks created yet. Click "Create Network" to get started!</td></tr>';
+                        html = '<tr><td colspan="9" style="text-align: center; color: #7f8c8d;">No networks created yet. Click "Create Network" to get started!</td></tr>';
                     } else {
                         data.networks.forEach(net => {
+                            // DHCP status display
+                            let dhcpStatus = '';
+                            if (net.dhcp_enabled) {
+                                dhcpStatus = `<span class="status-badge online" style="font-size: 10px;">ON</span>
+                                    <br><small>${net.dhcp_range || ''}</small>
+                                    <br><button class="btn" style="font-size: 10px; padding: 2px 6px; margin-top: 4px;" onclick="showDHCPLeases(${net.id})">Leases</button>
+                                    <button class="btn-danger" style="font-size: 10px; padding: 2px 6px;" onclick="disableDHCP(${net.id})">Off</button>`;
+                            } else {
+                                const hasSubnet = net.subnet && net.gateway;
+                                if (hasSubnet) {
+                                    dhcpStatus = `<span style="color: #7f8c8d; font-size: 11px;">Disabled</span>
+                                        <br><button class="btn" style="font-size: 10px; padding: 2px 6px; margin-top: 4px;" onclick="showEnableDHCPModal(${net.id}, '${net.name}', '${net.subnet}', '${net.gateway}')">Enable</button>`;
+                                } else {
+                                    dhcpStatus = `<span style="color: #95a5a6; font-size: 11px;">N/A</span>
+                                        <br><small style="color: #bdc3c7;">Need subnet</small>`;
+                                }
+                            }
+
                             html += `<tr>
                                 <td>${net.id}</td>
                                 <td><strong>${net.name}</strong></td>
                                 <td>${net.vni}</td>
                                 <td>${net.subnet || '-'}</td>
                                 <td>${net.gateway || '-'}</td>
+                                <td>${dhcpStatus}</td>
                                 <td>${net.switch_names ? net.switch_names.join(', ') : net.switches.length + ' switches'}</td>
                                 <td>${net.tunnel_count}</td>
                                 <td><button class="btn-danger" onclick="deleteNetwork(${net.id})">Delete</button></td>
@@ -1200,7 +1474,7 @@
                 })
                 .catch(e => {
                     document.getElementById('networks-body').innerHTML =
-                        '<tr><td colspan="8" style="color: red;">Error loading networks</td></tr>';
+                        '<tr><td colspan="9" style="color: red;">Error loading networks</td></tr>';
                 });
 
             // Update uptime
