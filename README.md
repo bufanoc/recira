@@ -10,8 +10,12 @@ Build and manage virtual overlay networks across multiple Linux hosts with a pro
 [![Python](https://img.shields.io/badge/python-3.6+-green.svg)](https://python.org)
 [![OVS](https://img.shields.io/badge/Open%20vSwitch-2.17+-orange.svg)](https://openvswitch.org)
 
-## Features (v0.5)
+## Features (v0.6)
 
+- **Host Auto-Provisioning** - Automatic OVS installation on Ubuntu/Debian/CentOS
+- **OS Detection** - Auto-detect Linux distribution and version
+- **MTU Optimization** - Configure 9000 MTU for VXLAN performance
+- **Health Monitoring** - Real-time host health and OVS status checks
 - **Virtual Networks** - Define named networks with auto-provisioned full-mesh tunnels
 - **OVS Discovery** - Auto-discover switches on local and remote Linux hosts
 - **VXLAN Tunnels** - Automatic full-mesh or manual point-to-point tunnels
@@ -117,7 +121,15 @@ recira/
 
 ## Current Status
 
-### v0.5 - Network Abstraction Layer (CURRENT)
+### v0.6 - Host Auto-Provisioning (CURRENT)
+- [x] OS detection (Ubuntu/Debian/CentOS/RHEL)
+- [x] Automatic OVS installation based on OS
+- [x] MTU 9000 configuration for VXLAN optimization
+- [x] OVS performance optimizations
+- [x] Host health monitoring API
+- [x] Auto-provisioning API endpoint
+
+### v0.5 - Network Abstraction Layer (COMPLETE)
 - [x] Network creation with name, VNI, subnet, gateway
 - [x] Automatic full-mesh tunnel provisioning
 - [x] Configuration persistence (JSON)
@@ -133,7 +145,7 @@ recira/
 - [x] Interactive modal forms
 - [x] Real-time tunnel status
 
-### Next: v0.6 - Host Auto-Provisioning
+### Next: v0.7 - DHCP Integration
 See [ROADMAP.md](docs/ROADMAP.md) for full development plan.
 
 ## API Documentation
@@ -145,12 +157,86 @@ Returns controller status and statistics.
 ```json
 {
   "status": "running",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "uptime": "2:15:30",
   "controller": "Recira - Virtual Network Platform",
   "hosts": 3,
   "switches": 4,
   "networks": 2
+}
+```
+
+### POST /api/hosts/provision
+Auto-provision a host with OVS installation and configuration.
+
+**Request:**
+```json
+{
+  "ip": "192.168.1.100",
+  "username": "root",
+  "password": "yourpassword",
+  "configure_mtu": true,
+  "optimize": true
+}
+```
+
+Notes:
+- Automatically detects OS (Ubuntu/Debian/CentOS/RHEL)
+- Installs OVS based on detected OS
+- Configures MTU to 9000 for VXLAN optimization
+- Applies OVS performance optimizations
+- This operation may take 5-10 minutes
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Host 192.168.1.100 provisioned successfully",
+  "provision_details": {
+    "os_type": "ubuntu",
+    "os_version": "22.04",
+    "ovs_installed": true,
+    "ovs_version": "2.17.9",
+    "mtu_configured": true,
+    "optimizations_applied": true
+  },
+  "host": {
+    "id": 2,
+    "hostname": "ovs-host-02",
+    "ip": "192.168.1.100",
+    "ovs_version": "2.17.9"
+  }
+}
+```
+
+### GET /api/hosts/health
+Get health status of a specific host.
+
+**Query Parameters:**
+- `ip` (required): Host IP address
+- `username` (optional): SSH username (default: root)
+- `password` (optional): SSH password
+
+**Example:**
+```
+GET /api/hosts/health?ip=192.168.1.100&username=root&password=secret
+```
+
+**Response:**
+```json
+{
+  "health": {
+    "timestamp": "2025-11-24T22:30:00",
+    "ip": "192.168.1.100",
+    "reachable": true,
+    "ovs_installed": true,
+    "ovs_running": true,
+    "ovs_version": "2.17.9",
+    "os_type": "ubuntu",
+    "os_version": "22.04",
+    "uptime": "up 3 days",
+    "load_average": "0.15, 0.10, 0.05"
+  }
 }
 ```
 
@@ -394,6 +480,6 @@ Apache License 2.0
 
 **Built by:** Carmine Bufano (bufanoc) + Claude Code
 **Started:** 2025-11-24
-**Status:** v0.5 - Network Abstraction Layer Complete!
+**Status:** v0.6 - Host Auto-Provisioning Complete!
 **Website:** (Coming soon)
 **GitHub:** https://github.com/bufanoc/recira

@@ -19,6 +19,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 from ovs_manager import ovs_manager
 import vxlan_manager as vxlan_mgr
 import network_manager as net_mgr
+import host_provisioner as host_prov
 
 PORT = 8080
 FRONTEND_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'frontend/37734')
@@ -79,7 +80,7 @@ class VXLANRequestHandler(http.server.SimpleHTTPRequestHandler):
 
             response = {
                 "status": "running",
-                "version": "0.5.0",
+                "version": "0.6.0",
                 "uptime": uptime_str,
                 "controller": "Recira - Virtual Network Platform",
                 "hosts": len(ovs_manager.get_all_hosts()),
@@ -236,6 +237,62 @@ class VXLANRequestHandler(http.server.SimpleHTTPRequestHandler):
                         "error": f"Failed to connect to {ip}"
                     }
 
+        elif path == '/api/hosts/provision' and data:
+            # Auto-provision a host with OVS installation
+            ip = data.get('ip')
+            username = data.get('username', 'root')
+            password = data.get('password')
+            configure_mtu = data.get('configure_mtu', True)
+            optimize = data.get('optimize', True)
+
+            if not ip or not password:
+                response = {"error": "Missing required fields: ip, password"}
+            else:
+                # Run provisioning (this may take several minutes)
+                provision_result = host_prov.provision_new_host(
+                    ip=ip,
+                    username=username,
+                    password=password
+                )
+
+                if provision_result['success']:
+                    # After provisioning, discover the host to add it to OVS manager
+                    host_info = ovs_manager.discover_remote_host(
+                        ip=ip,
+                        username=username,
+                        password=password
+                    )
+
+                    response = {
+                        "success": True,
+                        "message": f"Host {ip} provisioned successfully",
+                        "provision_details": provision_result,
+                        "host": host_info
+                    }
+                else:
+                    response = {
+                        "success": False,
+                        "error": "Provisioning failed",
+                        "details": provision_result
+                    }
+
+        elif path == '/api/hosts/health' and query:
+            # Get health status of a specific host
+            params = parse_qs(query) if isinstance(query, str) else query
+            ip = params.get('ip', [None])[0] if isinstance(query, str) else query.get('ip')
+            username = params.get('username', ['root'])[0] if isinstance(query, str) else query.get('username', 'root')
+            password = params.get('password', [None])[0] if isinstance(query, str) else query.get('password')
+
+            if not ip:
+                response = {"error": "Missing required parameter: ip"}
+            else:
+                health_status = host_prov.get_host_status(
+                    ip=ip,
+                    username=username,
+                    password=password
+                )
+                response = {"health": health_status}
+
         elif path == '/api/tunnels/create' and data:
             # Create a VXLAN tunnel
             src_switch_id = data.get('src_switch_id')
@@ -308,7 +365,7 @@ def main():
     global vxlan_manager, network_manager
 
     print("\n" + "="*60)
-    print("🚀 Recira - Virtual Network Platform v0.5")
+    print("🚀 Recira - Virtual Network Platform v0.6")
     print("="*60)
     print(f"\n📁 Frontend directory: {FRONTEND_DIR}")
 
@@ -340,18 +397,20 @@ def main():
     print(f"\n✨ Open your browser to: http://localhost:{PORT}")
     print(f"   (or http://192.168.88.164:{PORT} from other machines)")
     print("\n" + "="*60)
-    print("API Endpoints (v0.5 - Network Abstraction!):")
-    print("  GET  /api/status            - Controller status")
-    print("  GET  /api/switches          - Connected switches")
-    print("  GET  /api/hosts             - OVS hosts")
-    print("  POST /api/hosts/add         - Add remote host")
-    print("  GET  /api/networks          - Virtual networks (NEW!)")
-    print("  POST /api/networks/create   - Create network with full-mesh (NEW!)")
-    print("  POST /api/networks/delete   - Delete network and tunnels (NEW!)")
-    print("  GET  /api/tunnels           - VXLAN tunnels")
-    print("  POST /api/tunnels/create    - Create VXLAN tunnel")
-    print("  POST /api/tunnels/delete    - Delete VXLAN tunnel")
-    print("  GET  /api/topology          - Network topology")
+    print("API Endpoints (v0.6 - Host Auto-Provisioning!):")
+    print("  GET  /api/status              - Controller status")
+    print("  GET  /api/switches            - Connected switches")
+    print("  GET  /api/hosts               - OVS hosts")
+    print("  POST /api/hosts/add           - Add remote host")
+    print("  POST /api/hosts/provision     - Auto-provision host with OVS (NEW!)")
+    print("  GET  /api/hosts/health        - Get host health status (NEW!)")
+    print("  GET  /api/networks            - Virtual networks")
+    print("  POST /api/networks/create     - Create network with full-mesh")
+    print("  POST /api/networks/delete     - Delete network and tunnels")
+    print("  GET  /api/tunnels             - VXLAN tunnels")
+    print("  POST /api/tunnels/create      - Create VXLAN tunnel")
+    print("  POST /api/tunnels/delete      - Delete VXLAN tunnel")
+    print("  GET  /api/topology            - Network topology")
     print("="*60 + "\n")
 
     with socketserver.TCPServer(("", PORT), VXLANRequestHandler) as httpd:
