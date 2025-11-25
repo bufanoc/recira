@@ -61,7 +61,7 @@
 
 ## Current Session Status
 
-**Last Updated**: 2025-11-25 ~12:15 UTC
+**Last Updated**: 2025-11-25 ~13:00 UTC
 
 ### What Was Done This Session:
 
@@ -92,6 +92,11 @@
    - ovs-02 cannot ping ovs-01's VXLAN IP (10.172.88.232)
    - **User is recreating tunnels/networks to fix this**
 
+6. **Fixed dhcp_manager.py Gateway Port Tagging** (commit 1a8fed5):
+   - Added `vni` parameter to `_create_gateway_port` method
+   - Gateway port now properly tagged with VNI for overlay isolation
+   - Fix works for both new and existing ports
+
 ### Current Network State:
 
 **DEVNET** (Network ID: 7):
@@ -108,12 +113,12 @@
 
 ### 1. DHCP Manager Bug - Gateway Port Tagging
 **File**: `backend/dhcp_manager.py`
+**Status**: FIXED (commit 1a8fed5)
 
-When enabling DHCP, the gateway port needs to be tagged with the VNI:
-```python
-# After creating the gateway port, add:
-ovs-vsctl set port {port_name} tag={vni}
-```
+The `_create_gateway_port` method now:
+- Accepts `vni` parameter
+- Tags the gateway port with the VNI after creation
+- Works for both new ports and existing ports (re-tagging)
 
 ### 2. Underlay Network Connectivity
 The VXLAN underlay network (10.172.88.0/24) needs to be verified:
@@ -199,7 +204,7 @@ https://github.com/bufanoc/recira
    ```bash
    ssh root@192.168.88.195 'dhcp-test test 1003'
    ```
-4. **Fix dhcp_manager.py** to tag gateway port with VNI
+4. ~~**Fix dhcp_manager.py** to tag gateway port with VNI~~ **DONE** (commit 1a8fed5)
 5. **Continue with v0.8 Port Management** once DHCP is verified
 
 ---
