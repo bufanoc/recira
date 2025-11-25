@@ -1,7 +1,7 @@
 # Recira VXLAN Web Controller - Session Continuity Document
 
 **Date**: 2025-11-25
-**Version**: v0.7.6 - STP Loop Prevention
+**Version**: v0.7.7 - OpenFlow Internal Port Fix
 **Status**: Full-mesh VXLAN with STP loop prevention, DHCP working
 **GitHub**: https://github.com/bufanoc/recira
 
@@ -68,9 +68,17 @@
 
 ## Current Session Status (Nov 25)
 
-**Last Updated**: 2025-11-25 ~21:15 UTC
+**Last Updated**: 2025-11-25 ~23:30 UTC
 
-### What Was Done (Latest Session):
+### Current Test Endpoints (Active Now):
+
+| Host | Interface | Overlay IP | Status |
+|------|-----------|------------|--------|
+| ovs-01 | vni1005-gw | 10.0.0.1 | Gateway/DHCP server |
+| ovs-02 | vnet-test | 10.0.0.148 | Test endpoint |
+| ovs-3 | vnet-test | 10.0.0.131 | Test endpoint |
+
+### What Was Done (Latest Session - Continued):
 
 1. **Cleaned up all 3 hosts** - Removed leftover OVS ports and routes from previous experiments
    - ovs-01: Removed vxlan100, vxlan101, dhcp-test, old IPs/routes
@@ -100,6 +108,55 @@
    - ovs-02 got 10.0.0.127 from DHCP server on ovs-01
    - ovs-3 got 10.0.0.109 from DHCP server on ovs-01
 
+6. **Created test endpoints** for overlay connectivity testing
+   - Created `vnet-test` internal ports on ovs-02 and ovs-3
+   - Got DHCP leases: ovs-02=10.0.0.148, ovs-3=10.0.0.131
+
+7. **Investigated ARP broadcast flooding issue**
+   - Unicast traffic works (ping works with static ARP)
+   - ARP broadcasts not being flooded properly through STP topology
+   - Issue persists even with STP disabled (not STP-related)
+   - MAC tables age out, causing first packet to fail after idle
+
+8. **Verified MTU is NOT the issue**
+   - ens34 (underlay): 9000 MTU on all hosts
+   - br0 and vnet-test: 1500 MTU (correct)
+   - Large pings (1472 bytes) work fine
+   - No fragmentation occurring
+
+9. **ROOT CAUSE FOUND & FIXED - OpenFlow Internal Port Issue** (v0.7.7)
+   - **Root Cause**: OVS datapath forwards packets destined for internal port MACs
+     to the br0 LOCAL port instead of the actual internal port (e.g., vnet-test)
+   - When traffic arrives via VXLAN tunnels, the NORMAL action's MAC learning
+     maps internal port MACs to datapath port 1 (br0) instead of the correct port
+   - Datapath flow showed: `actions:1` (br0) instead of `actions:3` (vnet-test)
+   - **Solution**: Add explicit OpenFlow rules for internal ports:
+     ```
+     priority=200,dl_dst=<internal-port-MAC>,actions=output:<OF-port-number>
+     priority=100,arp,dl_dst=ff:ff:ff:ff:ff:ff,actions=FLOOD
+     ```
+   - **Fix implemented**: Added `_add_internal_port_flow()` method to dhcp_manager.py
+   - Rules are now automatically added when creating gateway/internal ports
+   - **Result**: Full bidirectional connectivity working between all hosts!
+
+### STP Topology (Current):
+```
+        ovs-01 (ROOT BRIDGE)
+       /                    \
+    [FWD]                  [FWD]
+     /                        \
+ovs-02 ------[BLOCKED]------ ovs-3
+```
+- Traffic between ovs-02 and ovs-3 routes through ovs-01
+- This is expected STP behavior preventing loops
+
+### ~~Known Issue - ARP Broadcast Flooding~~ **RESOLVED in v0.7.7**
+- ~~**Symptom**: First ping fails after idle period, subsequent pings work~~
+- ~~**Cause**: ARP broadcasts not flooding through VXLAN+STP properly~~
+- **Root Cause Found**: OVS datapath forwarded to br0 LOCAL instead of internal ports
+- **Fix**: Explicit OpenFlow rules for internal port MAC addresses
+- **Status**: FIXED - Full connectivity working!
+
 ### Previous Session Work:
 
 1. **Fixed dhcp_manager.py Gateway Port Tagging** (commit 1a8fed5)
@@ -122,6 +179,7 @@
 - Network "devs" (VNI 1005) with full-mesh tunnels
 - DHCP working on ovs-01 serving 10.0.0.100-150
 - Underlay network (10.172.88.0/24) fully operational
+- **Full overlay connectivity working** (ping between all hosts)
 
 ---
 
@@ -280,6 +338,7 @@ dhcp-test cleanup      # Remove test interface
 | v0.7.4 | Nov 25 | Storage location, API fixes |
 | v0.7.5 | Nov 25 | DHCP cross-host fix, host cleanup |
 | v0.7.6 | Nov 25 | STP loop prevention (critical fix) |
+| v0.7.7 | Nov 25 | OpenFlow internal port fix (connectivity fix) |
 
 ---
 
@@ -287,7 +346,7 @@ dhcp-test cleanup      # Remove test interface
 
 | Version | Feature | Status |
 |---------|---------|--------|
-| v0.7.6 | STP Loop Prevention | **Current** |
+| v0.7.7 | OpenFlow Internal Port Fix | **Current** |
 | v0.8 | Port Management | Next |
 | v1.0 | OpenFlow | Planned |
 | v1.1 | Monitoring | Planned |
@@ -297,6 +356,21 @@ dhcp-test cleanup      # Remove test interface
 ---
 
 ## Troubleshooting
+
+### Internal ports not receiving VXLAN traffic (v0.7.7 fix)
+```bash
+# Check if OpenFlow rules exist for internal ports
+ssh root@<host> 'ovs-ofctl dump-flows br0 | grep "priority=200"'
+
+# If missing, add rule for internal port MAC
+# First get MAC and port number:
+ssh root@<host> 'ip link show vnet-test | grep ether'  # Get MAC
+ssh root@<host> 'ovs-vsctl get interface vnet-test ofport'  # Get port number
+ssh root@<host> 'ovs-ofctl add-flow br0 "priority=200,dl_dst=<MAC>,actions=output:<port>"'
+
+# Also ensure ARP flood rule exists
+ssh root@<host> 'ovs-ofctl add-flow br0 "priority=100,arp,dl_dst=ff:ff:ff:ff:ff:ff,actions=FLOOD"'
+```
 
 ### Server won't start (port 8080 in use)
 ```bash
@@ -309,22 +383,14 @@ python3 backend/server.py
 ssh root@192.168.88.194  # Password: Xm9909ona
 ```
 
-### VXLAN tunnel not working
-```bash
-# Check VXLAN ports exist
-ssh root@192.168.88.194 'ovs-vsctl list-ports br0'
-
-# Check underlay connectivity
-ping -c 4 10.172.88.232
-```
-
 ---
 
 ## Recent Commits
 
 | Commit | Description |
 |--------|-------------|
-| (pending) | Enable STP by default in host provisioner |
+| 2827350 | OpenFlow internal port fix for VXLAN connectivity (v0.7.7) |
+| 6deb9d8 | Enable STP by default in host provisioner (v0.7.6) |
 | 3035eb9 | Update session continuity for v0.7.5 |
 | 57b4f51 | Fix DHCP not working across VXLAN tunnels (remove VLAN tags) |
 | 4f29ab8 | Merge session continuity documents |
@@ -370,4 +436,4 @@ ping -c 4 10.172.88.232
 ---
 
 *End of Session Continuity Document*
-*Last updated: 2025-11-25 ~21:15 UTC*
+*Last updated: 2025-11-25 ~22:50 UTC*

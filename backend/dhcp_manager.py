@@ -191,6 +191,94 @@ class DHCPManager:
             return False
 
         print(f"   Gateway {gateway_ip}/{prefix} assigned to {port_name}")
+
+        # Add OpenFlow rule to properly forward traffic to internal port
+        # This is required because OVS NORMAL action doesn't correctly forward
+        # traffic from VXLAN tunnels to internal ports
+        if not self._add_internal_port_flow(host_ip, username, password, bridge, port_name):
+            print(f"   Warning: Failed to add OpenFlow rule for {port_name}")
+            # Don't fail - the port is created, just might have connectivity issues
+
+        return True
+
+    def _add_internal_port_flow(self, host_ip: str, username: str, password: str,
+                                 bridge: str, port_name: str) -> bool:
+        """
+        Add OpenFlow rule to forward traffic to internal port by MAC address.
+
+        When traffic arrives via VXLAN tunnels, OVS's NORMAL action forwards
+        packets destined for internal port MACs to the br0 LOCAL port instead
+        of the actual internal port. This method adds an explicit OpenFlow rule
+        to correctly forward traffic to the internal port.
+
+        Args:
+            host_ip: Host IP address
+            username: SSH username
+            password: SSH password
+            bridge: OVS bridge name
+            port_name: Internal port name
+
+        Returns:
+            True if successful, False otherwise
+        """
+        # Get the MAC address of the internal port
+        rc, stdout, stderr = self._ssh_exec(
+            host_ip, username, password,
+            f"ip link show {port_name} | grep 'link/ether' | awk '{{print $2}}'"
+        )
+        if rc != 0 or not stdout.strip():
+            print(f"   Failed to get MAC address for {port_name}")
+            return False
+
+        mac_addr = stdout.strip().lower()
+        print(f"   Internal port MAC: {mac_addr}")
+
+        # Get the OpenFlow port number
+        rc, stdout, stderr = self._ssh_exec(
+            host_ip, username, password,
+            f"ovs-vsctl get interface {port_name} ofport"
+        )
+        if rc != 0 or not stdout.strip():
+            print(f"   Failed to get OpenFlow port number for {port_name}")
+            return False
+
+        try:
+            ofport = int(stdout.strip())
+        except ValueError:
+            print(f"   Invalid OpenFlow port number: {stdout.strip()}")
+            return False
+
+        print(f"   OpenFlow port number: {ofport}")
+
+        # Add the OpenFlow rule with high priority
+        # This rule forwards all traffic destined to this MAC to the correct port
+        flow_rule = f"priority=200,dl_dst={mac_addr},actions=output:{ofport}"
+        rc, stdout, stderr = self._ssh_exec(
+            host_ip, username, password,
+            f"ovs-ofctl add-flow {bridge} '{flow_rule}'"
+        )
+        if rc != 0:
+            print(f"   Failed to add OpenFlow rule: {stderr}")
+            return False
+
+        print(f"   Added OpenFlow rule for internal port forwarding")
+
+        # Also add ARP broadcast flood rule if not already present
+        # Check if flood rule exists
+        rc, stdout, stderr = self._ssh_exec(
+            host_ip, username, password,
+            f"ovs-ofctl dump-flows {bridge} | grep 'arp,dl_dst=ff:ff:ff:ff:ff:ff'"
+        )
+        if rc != 0 or 'arp' not in stdout:
+            # Add ARP flood rule
+            flood_rule = "priority=100,arp,dl_dst=ff:ff:ff:ff:ff:ff,actions=FLOOD"
+            rc, stdout, stderr = self._ssh_exec(
+                host_ip, username, password,
+                f"ovs-ofctl add-flow {bridge} '{flood_rule}'"
+            )
+            if rc == 0:
+                print(f"   Added ARP broadcast flood rule")
+
         return True
 
     def _generate_dnsmasq_config(self, network_id: int, vni: int, interface: str,
