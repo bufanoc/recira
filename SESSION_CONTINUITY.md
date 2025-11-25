@@ -1,7 +1,7 @@
 # Recira VXLAN Web Controller - Session Continuity Document
 
 **Date**: 2025-11-25
-**Version**: v0.7.1 - Host Persistence + DHCP Integration
+**Version**: v0.7.2 - Visual Topology + Tunnel Discovery
 **Status**: Fully Functional
 
 ---
@@ -28,13 +28,15 @@
 - Creating virtual networks with full-mesh topology
 - Dual-interface support (separate management and VXLAN data plane networks)
 - DHCP server integration using dnsmasq
-- **NEW in v0.7.1**: Host persistence (survives server restarts)
+- Host persistence (survives server restarts)
+- Tunnel discovery (auto-discovers existing VXLAN tunnels)
+- **NEW in v0.7.2**: Stunning visual topology with D3.js
 
 **Current Setup**:
 - Server running on: http://192.168.88.164:8080
-- Frontend: Dojo-based UI (repurposed from DVSC)
+- Frontend: Dojo-based UI + D3.js Topology (repurposed from DVSC)
 - Backend: Python HTTP server with OVS integration
-- Version: 0.7.1
+- Version: 0.7.2
 
 ---
 
@@ -69,45 +71,87 @@
 
 ---
 
-## Features Implemented in v0.7.1
+## Features Implemented in v0.7.2
 
-### Host Persistence (NEW!)
+### Visual Topology (NEW!)
 
-**Problem Solved**: Previously, hosts were lost on server restart.
+**Stunning D3.js-powered network visualization showing your entire VXLAN fabric!**
 
-**Solution**: Hosts are now saved to `/tmp/recira-hosts.json` and automatically reconnected on startup.
+**Visual Elements**:
+- Dark gradient background with subtle grid pattern (space-like theme)
+- Purple gradient host nodes (servers) with hostname and VXLAN IP displayed
+- Blue circular switch nodes showing OVS bridge names
+- Animated curved tunnel lines with vibrant gradient colors per VNI
+- Dashed lines connecting hosts to their OVS switches
+- Glowing effects on all nodes
 
-**How It Works**:
-1. When you add a host, credentials are saved to JSON file
-2. On server restart, OVSManager loads saved hosts
-3. Server automatically reconnects to each saved host via SSH
-4. Bridges are re-discovered and switches appear in UI
+**Interactivity**:
+- **Drag nodes** - Rearrange the layout to your liking
+- **Zoom/Pan** - Scroll to zoom, drag background to pan
+- **Hover tooltips** - Shows detailed info for hosts, switches, and tunnels
+- **Pause/Play** - Toggle the flowing animation on tunnel lines
+- **Reset** - Restore the force-directed layout
+- **Expand** - Make the visualization larger (500px -> 800px)
+
+**Real-time Updates**:
+- Stats panel: Hosts, Switches, Tunnels, VNIs count
+- Legend dynamically shows VNI colors
+- Auto-refreshes when data changes (30-second interval)
+
+**VNI Color Palette**:
+Each VNI gets a unique gradient color:
+- Blue (#00d2ff → #3a7bd5)
+- Pink-Red (#f857a6 → #ff5858)
+- Green (#11998e → #38ef7d)
+- Orange (#fc4a1a → #f7b733)
+- Purple (#8E2DE2 → #4A00E0)
+- And 5 more vibrant gradients!
 
 **Files Changed**:
-- `backend/ovs_manager.py`:
-  - Added `_load_config()` - Load hosts on startup
-  - Added `_save_config()` - Save hosts when added
-  - Added `_reconnect_host()` - Reconnect to saved host
-  - Added `get_host_credentials()` - Get stored credentials
-  - Modified `discover_remote_host()` - Store password and save
-  - Modified `get_all_hosts()` - Filter out passwords from API
+- `frontend/37734/index.html`:
+  - Added D3.js v7 library from CDN
+  - Added ~200 lines of CSS for topology styling
+  - Added ~500 lines of JavaScript for D3 visualization
+  - New topology container with controls, legend, stats
+
+### Tunnel Discovery (v0.7.2)
+
+**Problem Solved**: Tunnels were lost on server restart (stored in-memory only).
+
+**Solution**: Tunnels are now auto-discovered by scanning OVS bridges on all hosts.
+
+**How It Works**:
+1. On startup, `vxlan_manager.discover_tunnels()` is called
+2. Scans all hosts' OVS bridges via SSH for VXLAN ports
+3. Parses VNI and remote_ip from port options
+4. Deduplicates bidirectional tunnels (same VNI between same hosts)
+5. Creates tunnel records in memory with status "up"
+
+**Files Changed**:
+- `backend/vxlan_manager.py`:
+  - Added `discover_tunnels()` - Main discovery method
+  - Added `_get_vxlan_ports()` - Parse OVS show output
+  - Added `_find_host_by_vxlan_ip()` - Lookup host by IP
+  - Added `_find_switch_on_host()` - Find switch by host/bridge
+  - Updated `_build_ssh_cmd()` - Uses stored credentials
 
 - `backend/server.py`:
-  - Filter passwords from `/api/hosts/add` response
-  - Filter passwords from `/api/hosts/provision` response
+  - Calls `discover_tunnels()` during initialization
+  - Version updated to 0.7.2
 
-- `backend/dhcp_manager.py`:
-  - Uses `ovs_manager.get_host_credentials()` for stored passwords
+---
+
+## Previous Features
+
+### Host Persistence (v0.7.1)
+- Hosts saved to `/tmp/recira-hosts.json`
+- Auto-reconnect on server restart
+- Credentials stored with hosts
 
 ### DHCP Integration (v0.7.0)
-
-**Features**:
-- Enable/disable DHCP per network via web UI
-- Select which host runs the DHCP server
-- Configure DHCP scope (IP range, lease time, DNS servers)
-- Auto-configure dnsmasq on selected host
-- View active DHCP leases
-- DHCP reservations (MAC -> IP mapping)
+- Enable/disable DHCP per network
+- dnsmasq configuration
+- Leases viewer and reservations
 
 ---
 
@@ -118,9 +162,7 @@
 | Hosts | `/tmp/recira-hosts.json` | Yes |
 | Networks | `/tmp/recira-networks.json` | Yes |
 | DHCP | `/tmp/recira-dhcp.json` | Yes |
-| Tunnels | In-memory | No (but networks recreate them) |
-
-**Note**: Tunnels are stored as part of network config, so deleting and recreating a network will restore tunnels.
+| Tunnels | Discovered from OVS | Yes (via discovery) |
 
 ---
 
@@ -133,6 +175,12 @@
 - DHCP: Enabled on ovs-01 (192.168.88.194)
 - DHCP Range: 10.0.1.10 - 10.0.1.20
 - Switches: ovs-01, ovs-02, ovs-3 (full-mesh)
+
+**Current Statistics**:
+- 4 Hosts
+- 5 Switches
+- 14 Tunnels
+- 9 Unique VNIs
 
 ---
 
@@ -150,6 +198,11 @@
 - `POST /api/networks/create` - Create network
 - `POST /api/networks/delete` - Delete network
 
+### Tunnel Endpoints:
+- `GET /api/tunnels` - VXLAN tunnels (now persisted via discovery!)
+- `POST /api/tunnels/create` - Create tunnel
+- `POST /api/tunnels/delete` - Delete tunnel
+
 ### DHCP Endpoints:
 - `POST /api/dhcp/enable` - Enable DHCP
 - `POST /api/dhcp/disable` - Disable DHCP
@@ -161,7 +214,6 @@
 ### Other Endpoints:
 - `GET /api/status` - Controller status
 - `GET /api/switches` - Connected switches
-- `GET /api/tunnels` - VXLAN tunnels
 - `GET /api/topology` - Network topology
 
 ---
@@ -171,14 +223,14 @@
 ```
 /root/vxlan-web-controller/
 ├── backend/
-│   ├── server.py              # Main HTTP server (v0.7.1)
+│   ├── server.py              # Main HTTP server (v0.7.2)
 │   ├── ovs_manager.py         # OVS discovery + host persistence
-│   ├── vxlan_manager.py       # VXLAN tunnel creation
+│   ├── vxlan_manager.py       # VXLAN tunnel creation + discovery
 │   ├── network_manager.py     # Virtual network management
 │   ├── host_provisioner.py    # Auto-provisioning
 │   └── dhcp_manager.py        # DHCP/dnsmasq management
 ├── frontend/37734/
-│   └── index.html             # Web UI (Dojo-based)
+│   └── index.html             # Web UI (Dojo + D3.js topology)
 ├── docs/
 │   └── ROADMAP.md             # Development roadmap
 ├── README.md                  # Project documentation
@@ -189,6 +241,28 @@
 
 ## Troubleshooting
 
+### Topology Not Showing:
+```bash
+# Check D3.js is loading (browser console)
+# Should see no errors related to d3
+
+# Check API returns data
+curl http://localhost:8080/api/hosts
+curl http://localhost:8080/api/switches
+curl http://localhost:8080/api/tunnels
+```
+
+### Tunnels Not Discovered:
+```bash
+# Check server log
+tail -20 /tmp/recira-server.log | grep -i "tunnel"
+
+# Should see: "Discovered X existing tunnel(s)"
+
+# Verify VXLAN ports exist on hosts
+ssh root@192.168.88.194 'ovs-vsctl show | grep vxlan'
+```
+
 ### Hosts Not Reconnecting on Restart:
 ```bash
 # Check hosts file exists
@@ -196,9 +270,6 @@ cat /tmp/recira-hosts.json
 
 # Check server log for reconnection messages
 tail -50 /tmp/recira-server.log | grep -i "reconnect"
-
-# Verify SSH connectivity
-sshpass -p 'PASSWORD' ssh root@HOST_IP 'hostname'
 ```
 
 ### DHCP Not Working:
@@ -208,15 +279,7 @@ ssh root@192.168.88.194 'systemctl status dnsmasq'
 
 # Check config file
 ssh root@192.168.88.194 'cat /etc/dnsmasq.d/recira-network-*.conf'
-
-# Check gateway port
-ssh root@192.168.88.194 'ovs-vsctl show | grep vni'
-ssh root@192.168.88.194 'ip addr show vni1003-gw'
 ```
-
-### Network Tunnels Missing:
-- Delete and recreate the network (tunnels are created automatically)
-- Or manually check each host's OVS bridges
 
 ---
 
@@ -234,8 +297,9 @@ ssh root@192.168.88.194 'ip addr show vni1003-gw'
 
 - [x] v0.7.0 - DHCP Integration (COMPLETE)
 - [x] v0.7.1 - Host Persistence (COMPLETE)
+- [x] v0.7.2 - Tunnel Discovery (COMPLETE)
+- [x] v0.7.2 - Visual Topology (COMPLETE) - Originally planned for v0.9!
 - [ ] v0.8 - Port Management (assign ports to networks)
-- [ ] v0.9 - Visual Topology (D3.js network diagram)
 - [ ] v1.0 - OpenFlow Management
 - [ ] v1.1 - Statistics & Monitoring
 - [ ] v1.2 - KVM Integration
@@ -266,22 +330,33 @@ https://github.com/bufanoc/recira
 
 ## Session Status
 
-**Last Updated**: 2025-11-25 10:30 UTC
+**Last Updated**: 2025-11-25 11:00 UTC
 
-### v0.7.1 Host Persistence Complete
+### v0.7.2 Visual Topology + Tunnel Discovery Complete
 
-**Changes**:
-- Hosts now persist across server restarts
-- Credentials stored with hosts (cleartext for lab)
-- Auto-reconnect on startup
-- DHCP uses stored credentials automatically
-- API responses filter out passwords
-- Security warning added to README
+**Major Additions**:
+1. **Stunning D3.js Topology Visualization**
+   - Force-directed graph layout
+   - Animated gradient tunnel lines
+   - Interactive drag, zoom, pan
+   - Hover tooltips with details
+   - Real-time stats display
+   - VNI color-coded legend
+
+2. **Tunnel Discovery**
+   - Auto-discovers existing VXLAN ports on startup
+   - Scans all OVS bridges on all hosts
+   - Deduplicates bidirectional tunnels
+   - Uses stored SSH credentials
+   - 14 tunnels discovered automatically
 
 **Verified**:
-- Added 3 hosts, restarted server, all 3 reconnected automatically
-- DHCP enabled on DEVNET network
-- All tunnels and bridges verified on all hosts
+- Topology displays all 4 hosts, 5 switches, 14 tunnels
+- Animation flows smoothly on tunnel lines
+- Tooltips show correct data
+- Zoom/pan/drag all working
+- Real-time updates when data changes
+- Tunnels persist across server restarts via discovery
 
 ---
 
