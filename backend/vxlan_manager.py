@@ -60,26 +60,29 @@ class VXLANManager:
             print("Error: Could not determine VXLAN endpoint IPs")
             return None
 
-        # Create tunnel name
-        tunnel_name = f"vxlan{vni}"
+        # Create unique tunnel names (include remote IP last octet to avoid conflicts)
+        # For multiple tunnels with same VNI, we need unique port names
+        dst_ip_suffix = dst_vxlan_ip.split('.')[-1]  # Get last octet of remote IP
+        src_ip_suffix = src_vxlan_ip.split('.')[-1]
+        tunnel_name_src = f"vxlan{vni}_{dst_ip_suffix}"  # e.g., vxlan1009_233
+        tunnel_name_dst = f"vxlan{vni}_{src_ip_suffix}"  # e.g., vxlan1009_234
 
         # Create VXLAN interface on source switch
         print(f"Creating VXLAN tunnel: {src_switch['name']}@{src_host['hostname']} -> {dst_switch['name']}@{dst_host['hostname']}")
-        print(f"  VNI: {vni}, Remote IP: {dst_vxlan_ip}")
+        print(f"  VNI: {vni}, Remote IP: {dst_vxlan_ip}, Port: {tunnel_name_src}")
 
-        if not self._add_vxlan_port(src_host, src_switch['name'], tunnel_name, dst_vxlan_ip, vni):
+        if not self._add_vxlan_port(src_host, src_switch['name'], tunnel_name_src, dst_vxlan_ip, vni):
             print("Error: Failed to create VXLAN port on source switch")
             return None
 
         # Create reverse tunnel on destination switch
-        reverse_tunnel_name = f"vxlan{vni}"
         print(f"Creating reverse tunnel: {dst_switch['name']}@{dst_host['hostname']} -> {src_switch['name']}@{src_host['hostname']}")
-        print(f"  VNI: {vni}, Remote IP: {src_vxlan_ip}")
+        print(f"  VNI: {vni}, Remote IP: {src_vxlan_ip}, Port: {tunnel_name_dst}")
 
-        if not self._add_vxlan_port(dst_host, dst_switch['name'], reverse_tunnel_name, src_vxlan_ip, vni):
+        if not self._add_vxlan_port(dst_host, dst_switch['name'], tunnel_name_dst, src_vxlan_ip, vni):
             print("Error: Failed to create VXLAN port on destination switch")
             # Cleanup source port
-            self._del_vxlan_port(src_host, src_switch['name'], tunnel_name)
+            self._del_vxlan_port(src_host, src_switch['name'], tunnel_name_src)
             return None
 
         # Store tunnel info
@@ -94,7 +97,8 @@ class VXLANManager:
             'vni': vni,
             'src_vxlan_ip': src_vxlan_ip,
             'dst_vxlan_ip': dst_vxlan_ip,
-            'tunnel_name': tunnel_name,
+            'tunnel_name_src': tunnel_name_src,
+            'tunnel_name_dst': tunnel_name_dst,
             'status': 'up'
         }
 
@@ -110,19 +114,14 @@ class VXLANManager:
         return next((h for h in hosts if h['id'] == host_id), None)
 
     def _get_vxlan_ip(self, host: Dict) -> Optional[str]:
-        """Get the VXLAN endpoint IP for a host (10.172.88.x network)"""
-        if host['type'] == 'localhost':
-            # For localhost, return eth4 IP
-            return '10.172.88.231'  # Hard-coded for now
-        else:
-            # For remote hosts, extract from IP
-            # VM1: 192.168.88.194 -> 10.172.88.232
-            # VM2: 192.168.88.195 -> 10.172.88.233
-            if '192.168.88.194' in host['ip']:
-                return '10.172.88.232'
-            elif '192.168.88.195' in host['ip']:
-                return '10.172.88.233'
-        return None
+        """Get the VXLAN endpoint IP for a host"""
+        # Use stored vxlan_ip if available, otherwise fall back to management IP
+        vxlan_ip = host.get('vxlan_ip')
+        if vxlan_ip:
+            return vxlan_ip
+
+        # Fall back to management IP (for backward compatibility)
+        return host.get('ip')
 
     def _add_vxlan_port(self, host: Dict, bridge_name: str, port_name: str,
                        remote_ip: str, vni: int) -> bool:
@@ -194,8 +193,12 @@ class VXLANManager:
             return False
 
         # Delete both tunnel endpoints
-        self._del_vxlan_port(src_host, tunnel['src_switch_name'], tunnel['tunnel_name'])
-        self._del_vxlan_port(dst_host, tunnel['dst_switch_name'], tunnel['tunnel_name'])
+        # Handle both old and new tunnel name formats for backward compatibility
+        tunnel_name_src = tunnel.get('tunnel_name_src', tunnel.get('tunnel_name'))
+        tunnel_name_dst = tunnel.get('tunnel_name_dst', tunnel.get('tunnel_name'))
+
+        self._del_vxlan_port(src_host, tunnel['src_switch_name'], tunnel_name_src)
+        self._del_vxlan_port(dst_host, tunnel['dst_switch_name'], tunnel_name_dst)
 
         # Remove from dict
         del self.tunnels[tunnel_id]

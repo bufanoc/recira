@@ -3,7 +3,7 @@
 VXLAN Web Controller - Backend Server with Real OVS Discovery
 Repurposed from DVSC for generic OVS/VXLAN management
 
-This is v0.2 - Now with real OVS switch discovery!
+Version: 0.6.1 - Bug fixes (frontend timing + VXLAN port naming)
 """
 
 import http.server
@@ -80,7 +80,7 @@ class VXLANRequestHandler(http.server.SimpleHTTPRequestHandler):
 
             response = {
                 "status": "running",
-                "version": "0.6.0",
+                "version": "0.6.1",
                 "uptime": uptime_str,
                 "controller": "Recira - Virtual Network Platform",
                 "hosts": len(ovs_manager.get_all_hosts()),
@@ -215,6 +215,7 @@ class VXLANRequestHandler(http.server.SimpleHTTPRequestHandler):
             ip = data.get('ip')
             username = data.get('username', 'root')
             password = data.get('password')
+            vxlan_ip = data.get('vxlan_ip')  # Optional VXLAN IP
 
             if not ip or not password:
                 response = {"error": "Missing required fields: ip, password"}
@@ -222,7 +223,8 @@ class VXLANRequestHandler(http.server.SimpleHTTPRequestHandler):
                 host_info = ovs_manager.discover_remote_host(
                     ip=ip,
                     username=username,
-                    password=password
+                    password=password,
+                    vxlan_ip=vxlan_ip
                 )
 
                 if host_info:
@@ -242,6 +244,8 @@ class VXLANRequestHandler(http.server.SimpleHTTPRequestHandler):
             ip = data.get('ip')
             username = data.get('username', 'root')
             password = data.get('password')
+            vxlan_interface = data.get('vxlan_interface')
+            vxlan_ip = data.get('vxlan_ip')
             configure_mtu = data.get('configure_mtu', True)
             optimize = data.get('optimize', True)
 
@@ -252,7 +256,10 @@ class VXLANRequestHandler(http.server.SimpleHTTPRequestHandler):
                 provision_result = host_prov.provision_new_host(
                     ip=ip,
                     username=username,
-                    password=password
+                    password=password,
+                    vxlan_interface=vxlan_interface,
+                    configure_mtu=configure_mtu,
+                    optimize=optimize
                 )
 
                 if provision_result['success']:
@@ -260,7 +267,8 @@ class VXLANRequestHandler(http.server.SimpleHTTPRequestHandler):
                     host_info = ovs_manager.discover_remote_host(
                         ip=ip,
                         username=username,
-                        password=password
+                        password=password,
+                        vxlan_ip=vxlan_ip
                     )
 
                     response = {
@@ -292,6 +300,23 @@ class VXLANRequestHandler(http.server.SimpleHTTPRequestHandler):
                     password=password
                 )
                 response = {"health": health_status}
+
+        elif path == '/api/hosts/scan-interfaces' and query:
+            # Scan network interfaces on a host
+            params = parse_qs(query) if isinstance(query, str) else query
+            ip = params.get('ip', [None])[0] if isinstance(query, str) else query.get('ip')
+            username = params.get('username', ['root'])[0] if isinstance(query, str) else query.get('username', 'root')
+            password = params.get('password', [None])[0] if isinstance(query, str) else query.get('password')
+
+            if not ip:
+                response = {"error": "Missing required parameter: ip"}
+            else:
+                scan_result = host_prov.scan_host_interfaces(
+                    ip=ip,
+                    username=username,
+                    password=password
+                )
+                response = scan_result
 
         elif path == '/api/tunnels/create' and data:
             # Create a VXLAN tunnel

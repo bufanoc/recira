@@ -241,14 +241,14 @@
 <body class="claro">
     <div id="loading">
         <div style="font-size: 48px; margin-bottom: 20px;">🚀</div>
-        <div>Loading VXLAN Web Controller...</div>
-        <div style="font-size: 14px; margin-top: 10px; color: #7f8c8d;">v0.4 - Interactive Tunnel Management</div>
+        <div>Loading Recira...</div>
+        <div style="font-size: 14px; margin-top: 10px; color: #7f8c8d;">v0.6 - Host Auto-Provisioning</div>
     </div>
 
     <div id="app-container">
         <div class="header">
-            <h1>🌐 VXLAN Web Controller</h1>
-            <div class="subtitle">Generic OpenFlow/VXLAN SDN Management • v0.4</div>
+            <h1>🌐 Recira - Virtual Network Platform</h1>
+            <div class="subtitle">Open Source SDN Platform for VXLAN Overlay Networks • v0.6</div>
         </div>
 
         <div class="content">
@@ -286,12 +286,22 @@
                         <div class="label">Linux Hosts</div>
                     </div>
                 </div>
+
+                <div class="card">
+                    <h2>🌐 Virtual Networks</h2>
+                    <div id="network-count">
+                        <div class="stat success" id="network-stat">...</div>
+                        <div class="label">Configured Networks</div>
+                    </div>
+                </div>
             </div>
 
             <!-- Actions -->
             <div class="card" style="margin-bottom: 20px;">
                 <h2>⚡ Quick Actions</h2>
-                <button class="btn" onclick="alert('Coming in v0.5!')">➕ Add Host</button>
+                <button class="btn" onclick="showAddHostModal()">➕ Add Host</button>
+                <button class="btn" onclick="showProvisionHostModal()">🚀 Provision Host</button>
+                <button class="btn" onclick="showCreateNetworkModal()">🌐 Create Network</button>
                 <button class="btn" onclick="showCreateTunnelModal()">🔗 Create Tunnel</button>
                 <button class="btn" onclick="refreshData()">🔄 Refresh Data</button>
                 <button class="btn" onclick="window.location.href='/api/status'">📡 View API</button>
@@ -313,6 +323,28 @@
                     </thead>
                     <tbody id="switches-body">
                         <tr><td colspan="6" style="text-align: center;">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Virtual Networks Table -->
+            <div class="card" style="margin-top: 20px;">
+                <h2>🌐 Virtual Networks</h2>
+                <table id="networks-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Name</th>
+                            <th>VNI</th>
+                            <th>Subnet</th>
+                            <th>Gateway</th>
+                            <th>Switches</th>
+                            <th>Tunnels</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="networks-body">
+                        <tr><td colspan="8" style="text-align: center;">Loading...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -369,6 +401,170 @@
         </div>
     </div>
 
+    <!-- Add Host Modal -->
+    <div id="addHostModal" class="modal">
+        <div class="modal-content" style="width: 700px;">
+            <div class="modal-header">➕ Add Remote Host</div>
+
+            <!-- Step 1: Credentials -->
+            <div id="addHostStep1">
+                <div class="form-group">
+                    <label>Host IP Address (Management Network)</label>
+                    <input type="text" id="addHostIP" placeholder="192.168.88.100" required>
+                </div>
+                <div class="form-group">
+                    <label>SSH Username</label>
+                    <input type="text" id="addHostUsername" value="root" required>
+                </div>
+                <div class="form-group">
+                    <label>SSH Password</label>
+                    <input type="password" id="addHostPassword" required>
+                </div>
+                <div style="margin-bottom: 15px; padding: 10px; background: #e8f4f8; border-radius: 4px; font-size: 13px;">
+                    <strong>Next step:</strong> We'll scan the host's network interfaces so you can select which one to use for VXLAN tunnels.
+                </div>
+                <div>
+                    <button type="button" class="btn-primary" onclick="scanAddHostInterfaces()">Scan Interfaces</button>
+                    <button type="button" class="btn-secondary" onclick="closeAddHostModal()">Cancel</button>
+                </div>
+            </div>
+
+            <!-- Step 2: Interface Selection -->
+            <div id="addHostStep2" style="display: none;">
+                <div style="margin-bottom: 15px; padding: 10px; background: #e8f4f8; border-radius: 4px; font-size: 13px;">
+                    Select which interface to use for VXLAN overlay network (typically the one with larger MTU or 10.x network):
+                </div>
+                <div id="addHostInterfacesContainer" style="margin-bottom: 20px;">
+                    <table style="width: 100%; font-size: 13px;">
+                        <thead>
+                            <tr>
+                                <th style="width: 60px;">VXLAN</th>
+                                <th>Interface</th>
+                                <th>IP Address</th>
+                                <th>MTU</th>
+                                <th>State</th>
+                            </tr>
+                        </thead>
+                        <tbody id="addHostInterfacesList">
+                        </tbody>
+                    </table>
+                </div>
+                <div>
+                    <button type="button" class="btn-primary" onclick="submitAddHost()">Add Host</button>
+                    <button type="button" class="btn-secondary" onclick="backToAddHostStep1()">Back</button>
+                    <button type="button" class="btn-secondary" onclick="closeAddHostModal()">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Provision Host Modal -->
+    <div id="provisionHostModal" class="modal">
+        <div class="modal-content" style="width: 700px;">
+            <div class="modal-header">🚀 Provision New Host</div>
+
+            <!-- Step 1: Credentials -->
+            <div id="provisionStep1">
+                <div class="form-group">
+                    <label>Host IP Address (Management Network)</label>
+                    <input type="text" id="provisionHostIP" placeholder="192.168.88.100" required>
+                </div>
+                <div class="form-group">
+                    <label>SSH Username</label>
+                    <input type="text" id="provisionHostUsername" value="root" required>
+                </div>
+                <div class="form-group">
+                    <label>SSH Password</label>
+                    <input type="password" id="provisionHostPassword" required>
+                </div>
+                <div style="margin-bottom: 15px; padding: 10px; background: #e8f4f8; border-radius: 4px; font-size: 13px;">
+                    <strong>Next step:</strong> We'll scan the host's network interfaces so you can select which one to use for VXLAN tunnels.
+                </div>
+                <div>
+                    <button type="button" class="btn-primary" onclick="scanProvisionInterfaces()">Scan Interfaces</button>
+                    <button type="button" class="btn-secondary" onclick="closeProvisionHostModal()">Cancel</button>
+                </div>
+            </div>
+
+            <!-- Step 2: Interface Selection -->
+            <div id="provisionStep2" style="display: none;">
+                <div style="margin-bottom: 15px; padding: 10px; background: #e8f4f8; border-radius: 4px; font-size: 13px;">
+                    Select which interface to use for VXLAN overlay network (typically the one with larger MTU or 10.x network):
+                </div>
+                <div id="provisionInterfacesContainer" style="margin-bottom: 20px;">
+                    <table style="width: 100%; font-size: 13px;">
+                        <thead>
+                            <tr>
+                                <th style="width: 60px;">VXLAN</th>
+                                <th>Interface</th>
+                                <th>IP Address</th>
+                                <th>MTU</th>
+                                <th>State</th>
+                            </tr>
+                        </thead>
+                        <tbody id="provisionInterfacesList">
+                        </tbody>
+                    </table>
+                </div>
+                <div style="margin-bottom: 15px; padding: 10px; background: #fff3cd; border-radius: 4px; font-size: 13px;">
+                    <strong>⚠️ Provisioning will:</strong><br>
+                    • Detect OS type (Ubuntu/Debian/CentOS)<br>
+                    • Install Open vSwitch automatically<br>
+                    • Configure MTU to 9000 on VXLAN interface<br>
+                    • Apply performance optimizations<br>
+                    <br>
+                    <strong>⏱️ This may take 5-10 minutes!</strong>
+                </div>
+                <div>
+                    <button type="button" class="btn-primary" onclick="submitProvisionHost()">Start Provisioning</button>
+                    <button type="button" class="btn-secondary" onclick="backToProvisionStep1()">Back</button>
+                    <button type="button" class="btn-secondary" onclick="closeProvisionHostModal()">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Network Modal -->
+    <div id="createNetworkModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">🌐 Create Virtual Network</div>
+            <form id="networkForm">
+                <div class="form-group">
+                    <label>Network Name</label>
+                    <input type="text" id="networkName" placeholder="Production" required>
+                </div>
+                <div class="form-group">
+                    <label>Switches (Select multiple)</label>
+                    <select id="networkSwitches" multiple size="4" required style="height: 120px;">
+                        <option value="">Loading switches...</option>
+                    </select>
+                    <div style="font-size: 12px; color: #7f8c8d; margin-top: 5px;">
+                        Hold Ctrl (Cmd on Mac) to select multiple switches
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>VNI (Optional - auto-assigned if empty)</label>
+                    <input type="number" id="networkVNI" placeholder="Auto-assign" min="1" max="16777215">
+                </div>
+                <div class="form-group">
+                    <label>Subnet (Optional)</label>
+                    <input type="text" id="networkSubnet" placeholder="10.0.1.0/24">
+                </div>
+                <div class="form-group">
+                    <label>Gateway (Optional)</label>
+                    <input type="text" id="networkGateway" placeholder="10.0.1.1">
+                </div>
+                <div style="margin-bottom: 15px; padding: 10px; background: #e8f4f8; border-radius: 4px; font-size: 13px;">
+                    <strong>Note:</strong> This will automatically create full-mesh VXLAN tunnels between all selected switches.
+                </div>
+                <div>
+                    <button type="submit" class="btn-primary">Create Network</button>
+                    <button type="button" class="btn-secondary" onclick="closeCreateNetworkModal()">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script>
         // Global switches array
         let allSwitches = [];
@@ -407,12 +603,20 @@
             });
         }
 
-        // Handle tunnel form submission
+        // Handle form submissions
         document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('tunnelForm').addEventListener('submit', function(e) {
                 e.preventDefault();
                 createTunnel();
             });
+
+            document.getElementById('addHostForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                addHost();
+            });
+
+            // Provision host now uses button click handlers instead of form submit
+            // Network form event listener is attached in showCreateNetworkModal() to ensure form exists
         });
 
         function createTunnel() {
@@ -483,6 +687,426 @@
             });
         }
 
+        // Add Host modal functions
+        function showAddHostModal() {
+            document.getElementById('addHostModal').style.display = 'block';
+        }
+
+        function closeAddHostModal() {
+            document.getElementById('addHostModal').style.display = 'none';
+            // Reset both steps
+            document.getElementById('addHostStep1').style.display = 'block';
+            document.getElementById('addHostStep2').style.display = 'none';
+            // Reset form fields
+            document.getElementById('addHostIP').value = '';
+            document.getElementById('addHostUsername').value = 'root';
+            document.getElementById('addHostPassword').value = '';
+            addHostScannedInterfaces = [];
+        }
+
+        // Global state for Add Host scanned interfaces
+        let addHostScannedInterfaces = [];
+
+        function scanAddHostInterfaces() {
+            const ip = document.getElementById('addHostIP').value;
+            const username = document.getElementById('addHostUsername').value;
+            const password = document.getElementById('addHostPassword').value;
+
+            if (!ip || !password) {
+                alert('Please fill in all required fields');
+                return;
+            }
+
+            // Show loading state
+            const scanBtn = event.target;
+            const originalText = scanBtn.textContent;
+            scanBtn.disabled = true;
+            scanBtn.textContent = 'Scanning...';
+
+            fetch(`/api/hosts/scan-interfaces?ip=${encodeURIComponent(ip)}&username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`)
+                .then(r => r.json())
+                .then(response => {
+                    scanBtn.disabled = false;
+                    scanBtn.textContent = originalText;
+
+                    if (response.success && response.interfaces) {
+                        addHostScannedInterfaces = response.interfaces;
+                        displayAddHostInterfaces(response.interfaces);
+                        document.getElementById('addHostStep1').style.display = 'none';
+                        document.getElementById('addHostStep2').style.display = 'block';
+                    } else {
+                        alert('Failed to scan interfaces: ' + (response.error || 'Unknown error'));
+                    }
+                })
+                .catch(e => {
+                    scanBtn.disabled = false;
+                    scanBtn.textContent = originalText;
+                    alert('Failed to scan interfaces: ' + e);
+                });
+        }
+
+        function displayAddHostInterfaces(interfaces) {
+            const tbody = document.getElementById('addHostInterfacesList');
+            tbody.innerHTML = '';
+
+            interfaces.forEach((iface, index) => {
+                const row = document.createElement('tr');
+                // Auto-suggest VXLAN interface (10.172.x or MTU 9000)
+                const isVxlanSuggested = iface.ip.startsWith('10.172.') || iface.mtu == '9000';
+
+                row.innerHTML = `
+                    <td><input type="radio" name="addHostVxlanInterface" value="${index}" ${isVxlanSuggested ? 'checked' : ''}></td>
+                    <td><strong>${iface.name}</strong></td>
+                    <td>${iface.cidr}</td>
+                    <td>${iface.mtu}</td>
+                    <td><span style="color: ${iface.state === 'up' ? 'green' : 'red'}">${iface.state}</span></td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        function backToAddHostStep1() {
+            document.getElementById('addHostStep1').style.display = 'block';
+            document.getElementById('addHostStep2').style.display = 'none';
+        }
+
+        function submitAddHost() {
+            const selectedRadio = document.querySelector('input[name="addHostVxlanInterface"]:checked');
+            if (!selectedRadio) {
+                alert('Please select which interface to use for VXLAN overlay');
+                return;
+            }
+
+            const vxlanInterfaceIndex = parseInt(selectedRadio.value);
+            const vxlanInterface = addHostScannedInterfaces[vxlanInterfaceIndex];
+            const managementIP = document.getElementById('addHostIP').value;
+            const username = document.getElementById('addHostUsername').value;
+            const password = document.getElementById('addHostPassword').value;
+
+            // Disable button to prevent double-submission
+            const submitBtn = event.target;
+            const originalText = submitBtn.textContent;
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Adding Host...';
+
+            fetch('/api/hosts/add', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    ip: managementIP,
+                    username: username,
+                    password: password,
+                    vxlan_ip: vxlanInterface.ip
+                })
+            })
+            .then(r => r.json())
+            .then(response => {
+                submitBtn.disabled = false;
+                submitBtn.textContent = originalText;
+
+                if (response.success) {
+                    alert(`Host added successfully!\n\nHostname: ${response.host.hostname}\nManagement IP: ${managementIP}\nVXLAN IP: ${vxlanInterface.ip}\nOVS Version: ${response.host.ovs_version}\nBridges: ${response.host.bridges.length}`);
+                    closeAddHostModal();
+                    loadData();
+                } else {
+                    alert('Error adding host: ' + (response.error || 'Unknown error'));
+                }
+            })
+            .catch(e => {
+                submitBtn.disabled = false;
+                submitBtn.textContent = originalText;
+                alert('Failed to add host: ' + e);
+            });
+        }
+
+        // Provision Host modal functions (Two-step workflow with interface selection)
+        let provisionScannedInterfaces = [];
+
+        function showProvisionHostModal() {
+            document.getElementById('provisionHostModal').style.display = 'block';
+            document.getElementById('provisionStep1').style.display = 'block';
+            document.getElementById('provisionStep2').style.display = 'none';
+        }
+
+        function closeProvisionHostModal() {
+            document.getElementById('provisionHostModal').style.display = 'none';
+            document.getElementById('provisionHostIP').value = '';
+            document.getElementById('provisionHostUsername').value = 'root';
+            document.getElementById('provisionHostPassword').value = '';
+            document.getElementById('provisionStep1').style.display = 'block';
+            document.getElementById('provisionStep2').style.display = 'none';
+            provisionScannedInterfaces = [];
+        }
+
+        function backToProvisionStep1() {
+            document.getElementById('provisionStep1').style.display = 'block';
+            document.getElementById('provisionStep2').style.display = 'none';
+        }
+
+        function scanProvisionInterfaces() {
+            const ip = document.getElementById('provisionHostIP').value;
+            const username = document.getElementById('provisionHostUsername').value;
+            const password = document.getElementById('provisionHostPassword').value;
+
+            if (!ip || !password) {
+                alert('Please fill in all required fields');
+                return;
+            }
+
+            // Show loading state
+            const scanBtn = event.target;
+            const originalText = scanBtn.textContent;
+            scanBtn.disabled = true;
+            scanBtn.textContent = 'Scanning...';
+
+            fetch(`/api/hosts/scan-interfaces?ip=${encodeURIComponent(ip)}&username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`)
+                .then(r => r.json())
+                .then(response => {
+                    scanBtn.disabled = false;
+                    scanBtn.textContent = originalText;
+
+                    if (response.success && response.interfaces) {
+                        provisionScannedInterfaces = response.interfaces;
+                        displayProvisionInterfaces(response.interfaces);
+                        document.getElementById('provisionStep1').style.display = 'none';
+                        document.getElementById('provisionStep2').style.display = 'block';
+                    } else {
+                        alert('Failed to scan interfaces: ' + (response.error || 'Unknown error'));
+                    }
+                })
+                .catch(e => {
+                    scanBtn.disabled = false;
+                    scanBtn.textContent = originalText;
+                    alert('Failed to scan interfaces: ' + e);
+                });
+        }
+
+        function displayProvisionInterfaces(interfaces) {
+            const tbody = document.getElementById('provisionInterfacesList');
+            tbody.innerHTML = '';
+
+            interfaces.forEach((iface, index) => {
+                const row = document.createElement('tr');
+                const isVxlanSuggested = iface.ip.startsWith('10.172.') || iface.mtu == '9000';
+
+                row.innerHTML = `
+                    <td><input type="radio" name="vxlanInterface" value="${index}" ${isVxlanSuggested ? 'checked' : ''}></td>
+                    <td><strong>${iface.name}</strong></td>
+                    <td>${iface.cidr}</td>
+                    <td>${iface.mtu}</td>
+                    <td><span style="color: ${iface.state === 'up' ? 'green' : 'red'}">${iface.state}</span></td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        function submitProvisionHost() {
+            const selectedRadio = document.querySelector('input[name="vxlanInterface"]:checked');
+            if (!selectedRadio) {
+                alert('Please select which interface to use for VXLAN overlay');
+                return;
+            }
+
+            const vxlanInterfaceIndex = parseInt(selectedRadio.value);
+            const vxlanInterface = provisionScannedInterfaces[vxlanInterfaceIndex];
+            const managementIP = document.getElementById('provisionHostIP').value;
+            const username = document.getElementById('provisionHostUsername').value;
+            const password = document.getElementById('provisionHostPassword').value;
+
+            if (!confirm(`Provision host with VXLAN on ${vxlanInterface.name} (${vxlanInterface.ip})?\n\nThis may take 5-10 minutes.`)) {
+                return;
+            }
+
+            // Show progress
+            const submitBtn = event.target;
+            const originalText = submitBtn.textContent;
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Provisioning... (this may take several minutes)';
+
+            fetch('/api/hosts/provision', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    ip: managementIP,
+                    username: username,
+                    password: password,
+                    vxlan_interface: vxlanInterface.name,
+                    vxlan_ip: vxlanInterface.ip,
+                    configure_mtu: true,
+                    optimize: true
+                })
+            })
+            .then(r => r.json())
+            .then(response => {
+                submitBtn.disabled = false;
+                submitBtn.textContent = originalText;
+
+                if (response.success) {
+                    const details = response.provision_details;
+                    alert(`Host provisioned successfully!\n\n` +
+                          `OS: ${details.os_type} ${details.os_version}\n` +
+                          `OVS Version: ${details.ovs_version}\n` +
+                          `Management IP: ${managementIP}\n` +
+                          `VXLAN IP: ${vxlanInterface.ip}\n` +
+                          `MTU Configured: ${details.mtu_configured ? 'Yes' : 'No'}\n` +
+                          `Optimizations: ${details.optimizations_applied ? 'Applied' : 'Not applied'}`);
+                    closeProvisionHostModal();
+                    loadData();
+                } else {
+                    alert('Error provisioning host: ' + (response.error || 'Unknown error'));
+                }
+            })
+            .catch(e => {
+                submitBtn.disabled = false;
+                submitBtn.textContent = originalText;
+                alert('Failed to provision host: ' + e);
+            });
+        }
+
+        // Create Network modal functions
+        let networkFormListenerAttached = false;  // Flag to ensure listener is only attached once
+
+        function showCreateNetworkModal() {
+            populateNetworkSwitches();
+            document.getElementById('createNetworkModal').style.display = 'block';
+
+            // Attach event listener to form when modal is shown (ensures form exists in DOM)
+            if (!networkFormListenerAttached) {
+                const networkForm = document.getElementById('networkForm');
+                if (networkForm) {
+                    console.log('✅ Network form found in modal, attaching event listener');
+                    networkForm.addEventListener('submit', function(e) {
+                        console.log('🔥 Form submit event fired!');
+                        e.preventDefault();
+                        createNetwork();
+                    });
+                    networkFormListenerAttached = true;
+                } else {
+                    console.error('❌ ERROR: networkForm still not found in modal!');
+                }
+            }
+        }
+
+        function closeCreateNetworkModal() {
+            document.getElementById('createNetworkModal').style.display = 'none';
+            document.getElementById('networkForm').reset();
+        }
+
+        function populateNetworkSwitches() {
+            const select = document.getElementById('networkSwitches');
+            select.innerHTML = '';
+
+            allSwitches.forEach(sw => {
+                const optionText = `${sw.name}@${sw.hostname} (DPID: ${sw.dpid})`;
+                const option = new Option(optionText, sw.id);
+                select.add(option);
+            });
+        }
+
+        function createNetwork() {
+            console.log('🚀 createNetwork() called!');
+            alert('[DEBUG] createNetwork() function called! Check console for details.');
+
+            const name = document.getElementById('networkName').value;
+            const switchSelect = document.getElementById('networkSwitches');
+            const selectedSwitches = Array.from(switchSelect.selectedOptions).map(opt => parseInt(opt.value));
+            const vni = document.getElementById('networkVNI').value;
+            const subnet = document.getElementById('networkSubnet').value;
+            const gateway = document.getElementById('networkGateway').value;
+
+            console.log('Selected switches:', selectedSwitches);
+
+            if (!name) {
+                alert('Please enter a network name');
+                return;
+            }
+
+            if (selectedSwitches.length < 2) {
+                alert('Please select at least 2 switches for the network');
+                return;
+            }
+
+            const data = {
+                name: name,
+                switches: selectedSwitches,
+                subnet: subnet,
+                gateway: gateway
+            };
+
+            if (vni) {
+                data.vni = parseInt(vni);
+            }
+
+            console.log('Sending network create request:', data);
+
+            // Disable button (with null check)
+            const submitBtn = document.querySelector('#networkForm button[type="submit"]');
+            if (!submitBtn) {
+                console.error('Submit button not found!');
+                alert('UI Error: Submit button not found. Please refresh the page.');
+                return;
+            }
+
+            const originalText = submitBtn.textContent;
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Creating Network...';
+
+            fetch('/api/networks/create', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            })
+            .then(r => r.json())
+            .then(response => {
+                console.log('Network create response:', response);
+                submitBtn.disabled = false;
+                submitBtn.textContent = originalText;
+
+                if (response.success) {
+                    const network = response.network;
+                    alert('Network created successfully!\\n\\n' +
+                          'Name: ' + network.name + '\\n' +
+                          'VNI: ' + network.vni + '\\n' +
+                          'Switches: ' + network.switches.length + '\\n' +
+                          'Tunnels Created: ' + network.tunnels.length);
+                    closeCreateNetworkModal();
+                    loadData();
+                } else {
+                    alert('Error creating network: ' + (response.error || 'Unknown error'));
+                }
+            })
+            .catch(e => {
+                console.error('Network create error:', e);
+                submitBtn.disabled = false;
+                submitBtn.textContent = originalText;
+                alert('Failed to create network: ' + e);
+            });
+        }
+
+        function deleteNetwork(networkId) {
+            if (!confirm('Are you sure you want to delete this network? This will also delete all associated tunnels.')) {
+                return;
+            }
+
+            fetch('/api/networks/delete', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({network_id: networkId})
+            })
+            .then(r => r.json())
+            .then(response => {
+                if (response.success) {
+                    alert('Network deleted successfully!');
+                    loadData();
+                } else {
+                    alert('Error deleting network: ' + (response.error || 'Unknown error'));
+                }
+            })
+            .catch(e => {
+                alert('Failed to delete network: ' + e);
+            });
+        }
+
         // Load data from APIs
         function loadData() {
             // Load switches
@@ -547,6 +1171,36 @@
                 })
                 .catch(e => {
                     document.getElementById('host-stat').textContent = '?';
+                });
+
+            // Load networks
+            fetch('/api/networks')
+                .then(r => r.json())
+                .then(data => {
+                    document.getElementById('network-stat').textContent = data.networks.length;
+
+                    let html = '';
+                    if (data.networks.length === 0) {
+                        html = '<tr><td colspan="8" style="text-align: center; color: #7f8c8d;">No networks created yet. Click "Create Network" to get started!</td></tr>';
+                    } else {
+                        data.networks.forEach(net => {
+                            html += `<tr>
+                                <td>${net.id}</td>
+                                <td><strong>${net.name}</strong></td>
+                                <td>${net.vni}</td>
+                                <td>${net.subnet || '-'}</td>
+                                <td>${net.gateway || '-'}</td>
+                                <td>${net.switch_names ? net.switch_names.join(', ') : net.switches.length + ' switches'}</td>
+                                <td>${net.tunnel_count}</td>
+                                <td><button class="btn-danger" onclick="deleteNetwork(${net.id})">Delete</button></td>
+                            </tr>`;
+                        });
+                    }
+                    document.getElementById('networks-body').innerHTML = html;
+                })
+                .catch(e => {
+                    document.getElementById('networks-body').innerHTML =
+                        '<tr><td colspan="8" style="color: red;">Error loading networks</td></tr>';
                 });
 
             // Update uptime

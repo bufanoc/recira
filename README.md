@@ -10,13 +10,16 @@ Build and manage virtual overlay networks across multiple Linux hosts with a pro
 [![Python](https://img.shields.io/badge/python-3.6+-green.svg)](https://python.org)
 [![OVS](https://img.shields.io/badge/Open%20vSwitch-2.17+-orange.svg)](https://openvswitch.org)
 
-## Features (v0.6)
+## Features (v0.6.1)
 
 - **Host Auto-Provisioning** - Automatic OVS installation on Ubuntu/Debian/CentOS
+- **Dual-Interface Support** - Separate management and VXLAN data plane networks
+- **Interface Selection** - Choose VXLAN endpoint IP during host provisioning
 - **OS Detection** - Auto-detect Linux distribution and version
 - **MTU Optimization** - Configure 9000 MTU for VXLAN performance
 - **Health Monitoring** - Real-time host health and OVS status checks
 - **Virtual Networks** - Define named networks with auto-provisioned full-mesh tunnels
+- **Full-Mesh Topology** - Automatic N×(N-1)/2 tunnel creation (FIXED in v0.6.1)
 - **OVS Discovery** - Auto-discover switches on local and remote Linux hosts
 - **VXLAN Tunnels** - Automatic full-mesh or manual point-to-point tunnels
 - **Network Abstraction** - Subnet/gateway config with VNI auto-allocation
@@ -121,13 +124,20 @@ recira/
 
 ## Current Status
 
-### v0.6 - Host Auto-Provisioning (CURRENT)
+### v0.6.1 - Bug Fixes (CURRENT - 2025-11-25)
+- [x] **Frontend**: Fixed network creation form event listener timing issue
+- [x] **Backend**: Fixed VXLAN port naming conflicts in full-mesh topology
+- [x] **Testing**: Verified 3-node full-mesh creates all 3 tunnels correctly
+- [x] Unique tunnel names: `vxlan{vni}_{remote_ip_suffix}`
+
+### v0.6 - Host Auto-Provisioning (COMPLETE)
 - [x] OS detection (Ubuntu/Debian/CentOS/RHEL)
 - [x] Automatic OVS installation based on OS
 - [x] MTU 9000 configuration for VXLAN optimization
 - [x] OVS performance optimizations
 - [x] Host health monitoring API
 - [x] Auto-provisioning API endpoint
+- [x] Dual-interface support with VXLAN IP selection
 
 ### v0.5 - Network Abstraction Layer (COMPLETE)
 - [x] Network creation with name, VNI, subnet, gateway
@@ -480,6 +490,7 @@ Apache License 2.0
 
 **Built by:** Carmine Bufano (bufanoc) + Claude Code
 **Started:** 2025-11-24
-**Status:** v0.6 - Host Auto-Provisioning Complete!
+**Status:** v0.6.1 - Bug Fixes Complete!
+**Last Updated:** 2025-11-25
 **Website:** (Coming soon)
 **GitHub:** https://github.com/bufanoc/recira

@@ -17,9 +17,13 @@ class OVSManager:
         self.hosts = {}  # {host_id: {hostname, ip, bridges, ...}}
         self.next_host_id = 1
 
-    def discover_localhost(self) -> Dict:
+    def discover_localhost(self, vxlan_ip: Optional[str] = None) -> Dict:
         """
         Discover OVS bridges on localhost
+
+        Args:
+            vxlan_ip: IP address to use for VXLAN tunnels (optional)
+
         Returns host info with discovered bridges
         """
         try:
@@ -41,6 +45,8 @@ class OVSManager:
                 'id': self.next_host_id,
                 'hostname': hostname,
                 'ip': ip,
+                'management_ip': ip,  # For localhost, management IP is same as IP
+                'vxlan_ip': vxlan_ip if vxlan_ip else ip,  # Use provided or default to IP
                 'type': 'localhost',
                 'status': 'online',
                 'ovs_version': ovs_version,
@@ -172,15 +178,17 @@ class OVSManager:
 
     def discover_remote_host(self, ip: str, username: str,
                             password: Optional[str] = None,
-                            key_file: Optional[str] = None) -> Optional[Dict]:
+                            key_file: Optional[str] = None,
+                            vxlan_ip: Optional[str] = None) -> Optional[Dict]:
         """
         Discover OVS bridges on remote host via SSH
 
         Args:
-            ip: IP address of remote host
+            ip: IP address of remote host (management IP)
             username: SSH username
             password: SSH password (if using password auth)
             key_file: Path to SSH key file (if using key auth)
+            vxlan_ip: IP address to use for VXLAN tunnels (optional)
 
         Returns:
             Host info dict or None on error
@@ -237,6 +245,8 @@ class OVSManager:
                 'id': self.next_host_id,
                 'hostname': hostname,
                 'ip': ip,
+                'management_ip': ip,  # IP we use to connect/manage
+                'vxlan_ip': vxlan_ip if vxlan_ip else ip,  # IP for VXLAN tunnels
                 'type': 'remote',
                 'status': 'online',
                 'ovs_version': ovs_version,

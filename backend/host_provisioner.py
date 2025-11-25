@@ -206,44 +206,56 @@ class HostProvisioner:
             print(f"   ❌ OVS installation verification failed")
             return False
 
-    def configure_mtu(self, mtu: int = 9000) -> bool:
+    def configure_mtu(self, mtu: int = 9000, target_interface: Optional[str] = None) -> bool:
         """
         Configure MTU for optimal VXLAN performance
 
         Args:
             mtu: MTU size (default 9000 for jumbo frames)
+            target_interface: Specific interface to configure (if None, configure all)
 
         Returns:
             True if successful, False otherwise
         """
         print(f"⚙️  Configuring MTU to {mtu}...")
 
-        # Get list of physical network interfaces (exclude lo, ovs, docker, etc.)
-        rc, stdout, stderr = self._ssh_exec(
-            "ip -o link show | awk -F': ' '{print $2}' | grep -v '^lo\\|^ovs\\|^docker\\|^veth'"
-        )
-
-        if rc != 0:
-            print(f"   ⚠️  Could not list network interfaces")
-            return False
-
-        interfaces = [iface.strip() for iface in stdout.split('\n') if iface.strip()]
-
-        if not interfaces:
-            print(f"   ⚠️  No suitable network interfaces found")
-            return False
-
-        # Set MTU on each physical interface
-        success_count = 0
-        for iface in interfaces:
-            rc, stdout, stderr = self._ssh_exec(f'ip link set {iface} mtu {mtu}')
+        if target_interface:
+            # Configure only the specified interface
+            print(f"   - Targeting specific interface: {target_interface}")
+            rc, stdout, stderr = self._ssh_exec(f'ip link set {target_interface} mtu {mtu}')
             if rc == 0:
-                print(f"   ✅ Set MTU {mtu} on {iface}")
-                success_count += 1
+                print(f"   ✅ Set MTU {mtu} on {target_interface}")
+                return True
             else:
-                print(f"   ⚠️  Failed to set MTU on {iface}: {stderr}")
+                print(f"   ⚠️  Failed to set MTU on {target_interface}: {stderr}")
+                return False
+        else:
+            # Get list of physical network interfaces (exclude lo, ovs, docker, etc.)
+            rc, stdout, stderr = self._ssh_exec(
+                "ip -o link show | awk -F': ' '{print $2}' | grep -v '^lo\\|^ovs\\|^docker\\|^veth'"
+            )
 
-        return success_count > 0
+            if rc != 0:
+                print(f"   ⚠️  Could not list network interfaces")
+                return False
+
+            interfaces = [iface.strip() for iface in stdout.split('\n') if iface.strip()]
+
+            if not interfaces:
+                print(f"   ⚠️  No suitable network interfaces found")
+                return False
+
+            # Set MTU on each physical interface
+            success_count = 0
+            for iface in interfaces:
+                rc, stdout, stderr = self._ssh_exec(f'ip link set {iface} mtu {mtu}')
+                if rc == 0:
+                    print(f"   ✅ Set MTU {mtu} on {iface}")
+                    success_count += 1
+                else:
+                    print(f"   ⚠️  Failed to set MTU on {iface}: {stderr}")
+
+            return success_count > 0
 
     def optimize_ovs(self) -> bool:
         """
@@ -325,13 +337,15 @@ class HostProvisioner:
 
         return health
 
-    def provision_host(self, configure_mtu: bool = True, optimize: bool = True) -> Dict:
+    def provision_host(self, configure_mtu: bool = True, optimize: bool = True,
+                      vxlan_interface: Optional[str] = None) -> Dict:
         """
         Fully provision a host with OVS
 
         Args:
             configure_mtu: Set MTU to 9000 for VXLAN optimization
             optimize: Apply OVS optimizations
+            vxlan_interface: Specific interface to use for VXLAN (optional)
 
         Returns:
             Dictionary with provisioning results
@@ -343,11 +357,14 @@ class HostProvisioner:
             'ovs_installed': False,
             'mtu_configured': False,
             'optimizations_applied': False,
+            'vxlan_interface': vxlan_interface,
             'errors': []
         }
 
         print(f"\n{'='*60}")
         print(f"🚀 Provisioning Host: {self.ip}")
+        if vxlan_interface:
+            print(f"   VXLAN Interface: {vxlan_interface}")
         print(f"{'='*60}\n")
 
         # Step 1: Detect OS
@@ -374,9 +391,9 @@ class HostProvisioner:
         result['ovs_installed'] = True
         result['ovs_version'] = self.ovs_version
 
-        # Step 3: Configure MTU
+        # Step 3: Configure MTU (only on specified VXLAN interface if provided)
         if configure_mtu:
-            if self.configure_mtu(9000):
+            if self.configure_mtu(9000, target_interface=vxlan_interface):
                 result['mtu_configured'] = True
             else:
                 result['errors'].append('MTU configuration had warnings (non-fatal)')
@@ -397,7 +414,9 @@ class HostProvisioner:
 
 # Module-level functions for easier API integration
 
-def provision_new_host(ip: str, username: str = 'root', password: str = None) -> Dict:
+def provision_new_host(ip: str, username: str = 'root', password: str = None,
+                      vxlan_interface: Optional[str] = None, configure_mtu: bool = True,
+                      optimize: bool = True) -> Dict:
     """
     Convenience function to provision a new host
 
@@ -405,12 +424,19 @@ def provision_new_host(ip: str, username: str = 'root', password: str = None) ->
         ip: Host IP address
         username: SSH username (default: root)
         password: SSH password
+        vxlan_interface: Specific interface to use for VXLAN (optional)
+        configure_mtu: Set MTU to 9000 for VXLAN optimization
+        optimize: Apply OVS optimizations
 
     Returns:
         Dictionary with provisioning results
     """
     provisioner = HostProvisioner(ip=ip, username=username, password=password)
-    return provisioner.provision_host()
+    return provisioner.provision_host(
+        configure_mtu=configure_mtu,
+        optimize=optimize,
+        vxlan_interface=vxlan_interface
+    )
 
 
 def get_host_status(ip: str, username: str = 'root', password: str = None) -> Dict:
@@ -427,3 +453,70 @@ def get_host_status(ip: str, username: str = 'root', password: str = None) -> Di
     """
     provisioner = HostProvisioner(ip=ip, username=username, password=password)
     return provisioner.get_host_health()
+
+
+def scan_host_interfaces(ip: str, username: str = 'root', password: str = None) -> Dict:
+    """
+    Scan all network interfaces on a host
+
+    Args:
+        ip: Host IP address
+        username: SSH username (default: root)
+        password: SSH password
+
+    Returns:
+        Dictionary with interfaces list
+    """
+    provisioner = HostProvisioner(ip=ip, username=username, password=password)
+
+    # Get all interfaces with IPs
+    rc, stdout, stderr = provisioner._ssh_exec(
+        "ip -4 addr show | grep -E '^[0-9]+:|inet ' | sed 's/^[0-9]*: //' | sed 's/: <.*$//' | paste -d ' ' - -"
+    )
+
+    if rc != 0:
+        return {'success': False, 'error': 'Failed to query interfaces'}
+
+    interfaces = []
+    for line in stdout.strip().split('\n'):
+        if not line.strip():
+            continue
+
+        parts = line.split()
+        if len(parts) >= 2:
+            iface_name = parts[0]
+
+            # Skip loopback and docker interfaces
+            if iface_name == 'lo' or iface_name.startswith('docker') or iface_name.startswith('veth'):
+                continue
+
+            # Extract IP and netmask from "inet 192.168.88.1/24"
+            inet_parts = [p for p in parts if 'inet' in p or '/' in p]
+            if inet_parts:
+                for part in inet_parts:
+                    if '/' in part and not part.startswith('inet'):
+                        ip_cidr = part
+                        ip_addr, prefix = ip_cidr.split('/')
+
+                        # Get MTU for this interface
+                        rc_mtu, stdout_mtu, _ = provisioner._ssh_exec(f"cat /sys/class/net/{iface_name}/mtu")
+                        mtu = stdout_mtu.strip() if rc_mtu == 0 else 'unknown'
+
+                        # Get link state
+                        rc_state, stdout_state, _ = provisioner._ssh_exec(f"cat /sys/class/net/{iface_name}/operstate")
+                        state = stdout_state.strip() if rc_state == 0 else 'unknown'
+
+                        interfaces.append({
+                            'name': iface_name,
+                            'ip': ip_addr,
+                            'prefix': prefix,
+                            'cidr': ip_cidr,
+                            'mtu': mtu,
+                            'state': state
+                        })
+                        break
+
+    return {
+        'success': True,
+        'interfaces': interfaces
+    }
