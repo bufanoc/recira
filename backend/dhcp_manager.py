@@ -142,9 +142,9 @@ class DHCPManager:
 
     def _create_gateway_port(self, host_ip: str, username: str, password: str,
                              bridge: str, port_name: str, gateway_ip: str,
-                             prefix: str = '24') -> bool:
-        """Create OVS internal port and assign gateway IP"""
-        print(f"   Creating gateway port {port_name} on {bridge}...")
+                             vni: int, prefix: str = '24') -> bool:
+        """Create OVS internal port, tag with VNI, and assign gateway IP"""
+        print(f"   Creating gateway port {port_name} on {bridge} (VNI {vni})...")
 
         # Check if port already exists
         rc, stdout, stderr = self._ssh_exec(
@@ -164,6 +164,16 @@ class DHCPManager:
                 print(f"   Failed to create port: {stderr}")
                 return False
             print(f"   Created internal port {port_name}")
+
+        # Tag the port with VNI (critical for overlay network isolation)
+        rc, stdout, stderr = self._ssh_exec(
+            host_ip, username, password,
+            f'ovs-vsctl set port {port_name} tag={vni}'
+        )
+        if rc != 0:
+            print(f"   Warning: Failed to tag port with VNI: {stderr}")
+        else:
+            print(f"   Tagged port {port_name} with VNI {vni}")
 
         # Assign IP address
         rc, stdout, stderr = self._ssh_exec(
@@ -333,10 +343,10 @@ no-resolv
             result['message'] = 'Failed to install dnsmasq'
             return result
 
-        # Step 2: Create gateway internal port
+        # Step 2: Create gateway internal port (tagged with VNI for overlay isolation)
         port_name = f"vni{vni}-gw"
         if not self._create_gateway_port(host_ip, username, password,
-                                         bridge, port_name, gateway, prefix):
+                                         bridge, port_name, gateway, vni, prefix):
             result['message'] = 'Failed to create gateway port'
             return result
 
