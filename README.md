@@ -10,10 +10,13 @@ Build and manage virtual overlay networks across multiple Linux hosts with a pro
 [![Python](https://img.shields.io/badge/python-3.6+-green.svg)](https://python.org)
 [![OVS](https://img.shields.io/badge/Open%20vSwitch-2.17+-orange.svg)](https://openvswitch.org)
 
-## Features (v0.4)
+## Features (v0.5)
 
+- **Virtual Networks** - Define named networks with auto-provisioned full-mesh tunnels
 - **OVS Discovery** - Auto-discover switches on local and remote Linux hosts
-- **VXLAN Tunnels** - Create point-to-point VXLAN tunnels between switches
+- **VXLAN Tunnels** - Automatic full-mesh or manual point-to-point tunnels
+- **Network Abstraction** - Subnet/gateway config with VNI auto-allocation
+- **Configuration Persistence** - Network configs saved to JSON
 - **Interactive UI** - Professional web interface (repurposed from Citrix DVSC)
 - **Real-time Monitoring** - Live switch status, port counts, tunnel state
 - **Multi-host Support** - Manage OVS across multiple hosts via SSH
@@ -114,7 +117,15 @@ recira/
 
 ## Current Status
 
-### v0.4 - Interactive Management (CURRENT)
+### v0.5 - Network Abstraction Layer (CURRENT)
+- [x] Network creation with name, VNI, subnet, gateway
+- [x] Automatic full-mesh tunnel provisioning
+- [x] Configuration persistence (JSON)
+- [x] Network management API (create/read/delete)
+- [x] VNI auto-allocation (prevents conflicts)
+- [x] Per-network switch membership tracking
+
+### v0.4 - Interactive Management (COMPLETE)
 - [x] Web UI dashboard with real-time data
 - [x] OVS switch discovery (localhost + SSH remotes)
 - [x] VXLAN tunnel creation via UI
@@ -122,7 +133,7 @@ recira/
 - [x] Interactive modal forms
 - [x] Real-time tunnel status
 
-### Next: v0.5 - Network Abstraction
+### Next: v0.6 - Host Auto-Provisioning
 See [ROADMAP.md](docs/ROADMAP.md) for full development plan.
 
 ## API Documentation
@@ -134,10 +145,90 @@ Returns controller status and statistics.
 ```json
 {
   "status": "running",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "uptime": "2:15:30",
+  "controller": "Recira - Virtual Network Platform",
   "hosts": 3,
-  "switches": 4
+  "switches": 4,
+  "networks": 2
+}
+```
+
+### GET /api/networks
+List all virtual networks.
+
+**Response:**
+```json
+{
+  "networks": [
+    {
+      "id": 1,
+      "name": "Production",
+      "vni": 1000,
+      "subnet": "10.0.1.0/24",
+      "gateway": "10.0.1.1",
+      "switches": [1, 2, 3],
+      "switch_names": ["s1", "s2", "s3"],
+      "tunnel_count": 3,
+      "created_at": "2025-11-24T22:03:25.203823"
+    }
+  ]
+}
+```
+
+### POST /api/networks/create
+Create virtual network with automatic full-mesh tunnels.
+
+**Request:**
+```json
+{
+  "name": "Production",
+  "switches": [1, 2, 3],
+  "subnet": "10.0.1.0/24",
+  "gateway": "10.0.1.1",
+  "vni": 1000
+}
+```
+
+Notes:
+- `name`: Required - Human-readable network name
+- `switches`: Required - List of switch IDs (minimum 2)
+- `subnet`: Optional - Network subnet in CIDR notation
+- `gateway`: Optional - Gateway IP address
+- `vni`: Optional - Auto-allocated if not specified
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Network 'Production' created successfully",
+  "network": {
+    "id": 1,
+    "name": "Production",
+    "vni": 1000,
+    "subnet": "10.0.1.0/24",
+    "gateway": "10.0.1.1",
+    "switches": [1, 2, 3],
+    "tunnels": [1, 2, 3]
+  }
+}
+```
+
+### POST /api/networks/delete
+Delete virtual network and all associated tunnels.
+
+**Request:**
+```json
+{
+  "network_id": 1
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Network deleted successfully"
 }
 ```
 
@@ -303,6 +394,6 @@ Apache License 2.0
 
 **Built by:** Carmine Bufano (bufanoc) + Claude Code
 **Started:** 2025-11-24
-**Status:** v0.4 - Interactive Management Complete!
+**Status:** v0.5 - Network Abstraction Layer Complete!
 **Website:** (Coming soon)
 **GitHub:** https://github.com/bufanoc/recira

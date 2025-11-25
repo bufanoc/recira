@@ -18,6 +18,7 @@ from datetime import datetime
 sys.path.insert(0, os.path.dirname(__file__))
 from ovs_manager import ovs_manager
 import vxlan_manager as vxlan_mgr
+import network_manager as net_mgr
 
 PORT = 8080
 FRONTEND_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'frontend/37734')
@@ -25,8 +26,9 @@ FRONTEND_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'fronten
 # Server start time for uptime calculation
 SERVER_START_TIME = datetime.now()
 
-# Initialize VXLAN manager
+# Initialize managers
 vxlan_manager = None
+network_manager = None
 
 class VXLANRequestHandler(http.server.SimpleHTTPRequestHandler):
     """Custom request handler for VXLAN Web Controller"""
@@ -77,11 +79,12 @@ class VXLANRequestHandler(http.server.SimpleHTTPRequestHandler):
 
             response = {
                 "status": "running",
-                "version": "0.4.0",
+                "version": "0.5.0",
                 "uptime": uptime_str,
-                "controller": "VXLAN Web Controller",
+                "controller": "Recira - Virtual Network Platform",
                 "hosts": len(ovs_manager.get_all_hosts()),
-                "switches": len(ovs_manager.get_all_switches())
+                "switches": len(ovs_manager.get_all_switches()),
+                "networks": len(network_manager.get_all_networks()) if network_manager else 0
             }
 
         elif path == '/api/switches':
@@ -140,6 +143,71 @@ class VXLANRequestHandler(http.server.SimpleHTTPRequestHandler):
                 response = {"tunnels": tunnels}
             else:
                 response = {"tunnels": []}
+
+        elif path == '/api/networks':
+            # Get all virtual networks
+            if network_manager:
+                networks = network_manager.get_all_networks()
+                response = {"networks": networks}
+            else:
+                response = {"networks": []}
+
+        elif path == '/api/networks/create' and data:
+            # Create a virtual network
+            name = data.get('name')
+            switches = data.get('switches', [])  # List of switch IDs
+            vni = data.get('vni')  # Optional
+            subnet = data.get('subnet', '')
+            gateway = data.get('gateway', '')
+
+            if not name:
+                response = {"error": "Missing required field: name"}
+            elif not switches or len(switches) < 2:
+                response = {"error": "Network requires at least 2 switches"}
+            elif not network_manager:
+                response = {"error": "Network manager not initialized"}
+            else:
+                network = network_manager.create_network(
+                    name=name,
+                    switches=switches,
+                    vni=int(vni) if vni else None,
+                    subnet=subnet,
+                    gateway=gateway
+                )
+
+                if network:
+                    response = {
+                        "success": True,
+                        "message": f"Network '{name}' created successfully",
+                        "network": network.to_dict()
+                    }
+                else:
+                    response = {
+                        "success": False,
+                        "error": "Failed to create network"
+                    }
+
+        elif path == '/api/networks/delete' and data:
+            # Delete a virtual network
+            network_id = data.get('network_id')
+
+            if not network_id:
+                response = {"error": "Missing required field: network_id"}
+            elif not network_manager:
+                response = {"error": "Network manager not initialized"}
+            else:
+                success = network_manager.delete_network(int(network_id))
+
+                if success:
+                    response = {
+                        "success": True,
+                        "message": "Network deleted successfully"
+                    }
+                else:
+                    response = {
+                        "success": False,
+                        "error": "Failed to delete network (network not found?)"
+                    }
 
         elif path == '/api/hosts/add' and data:
             # Add a remote host
@@ -237,10 +305,10 @@ class VXLANRequestHandler(http.server.SimpleHTTPRequestHandler):
 
 def main():
     """Start the web server"""
-    global vxlan_manager
+    global vxlan_manager, network_manager
 
     print("\n" + "="*60)
-    print("🚀 VXLAN Web Controller v0.4")
+    print("🚀 Recira - Virtual Network Platform v0.5")
     print("="*60)
     print(f"\n📁 Frontend directory: {FRONTEND_DIR}")
 
@@ -263,19 +331,27 @@ def main():
     vxlan_manager = vxlan_mgr.initialize(ovs_manager)
     print("   ✅ VXLAN manager ready")
 
+    # Initialize Network manager
+    print("\n🌐 Initializing virtual network manager...")
+    network_manager = net_mgr.initialize(ovs_manager, vxlan_manager)
+    print("   ✅ Network manager ready")
+
     print(f"\n🌐 Server starting on port {PORT}...")
     print(f"\n✨ Open your browser to: http://localhost:{PORT}")
     print(f"   (or http://192.168.88.164:{PORT} from other machines)")
     print("\n" + "="*60)
-    print("API Endpoints (v0.4 - Interactive Management!):")
-    print("  GET  /api/status           - Controller status")
-    print("  GET  /api/switches         - Connected switches (REAL)")
-    print("  GET  /api/hosts            - OVS hosts (REAL)")
-    print("  POST /api/hosts/add        - Add remote host")
-    print("  GET  /api/tunnels          - VXLAN tunnels (REAL)")
-    print("  POST /api/tunnels/create   - Create VXLAN tunnel (NEW UI!)")
-    print("  POST /api/tunnels/delete   - Delete VXLAN tunnel (NEW!)")
-    print("  GET  /api/topology         - Network topology")
+    print("API Endpoints (v0.5 - Network Abstraction!):")
+    print("  GET  /api/status            - Controller status")
+    print("  GET  /api/switches          - Connected switches")
+    print("  GET  /api/hosts             - OVS hosts")
+    print("  POST /api/hosts/add         - Add remote host")
+    print("  GET  /api/networks          - Virtual networks (NEW!)")
+    print("  POST /api/networks/create   - Create network with full-mesh (NEW!)")
+    print("  POST /api/networks/delete   - Delete network and tunnels (NEW!)")
+    print("  GET  /api/tunnels           - VXLAN tunnels")
+    print("  POST /api/tunnels/create    - Create VXLAN tunnel")
+    print("  POST /api/tunnels/delete    - Delete VXLAN tunnel")
+    print("  GET  /api/topology          - Network topology")
     print("="*60 + "\n")
 
     with socketserver.TCPServer(("", PORT), VXLANRequestHandler) as httpd:
