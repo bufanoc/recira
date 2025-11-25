@@ -1,8 +1,22 @@
 # Recira VXLAN Web Controller - Session Continuity Document
 
 **Date**: 2025-11-25
-**Version**: v0.7.0 - DHCP Integration
-**Status**: Fully Functional with DHCP Support
+**Version**: v0.7.1 - Host Persistence + DHCP Integration
+**Status**: Fully Functional
+
+---
+
+## SECURITY WARNING
+
+> **LAB/DEVELOPMENT USE ONLY**
+>
+> This software stores SSH credentials in **cleartext** for convenience.
+> Do NOT use in production without implementing proper credential management.
+>
+> Sensitive data files:
+> - `/tmp/recira-hosts.json` - Host SSH credentials
+> - `/tmp/recira-dhcp.json` - DHCP configurations
+> - `/tmp/recira-networks.json` - Network configurations
 
 ---
 
@@ -13,13 +27,14 @@
 - Managing VXLAN tunnels between switches
 - Creating virtual networks with full-mesh topology
 - Dual-interface support (separate management and VXLAN data plane networks)
-- **NEW in v0.7**: DHCP server integration using dnsmasq
+- DHCP server integration using dnsmasq
+- **NEW in v0.7.1**: Host persistence (survives server restarts)
 
 **Current Setup**:
 - Server running on: http://192.168.88.164:8080
 - Frontend: Dojo-based UI (repurposed from DVSC)
 - Backend: Python HTTP server with OVS integration
-- Version: 0.7.0
+- Version: 0.7.1
 
 ---
 
@@ -29,39 +44,64 @@
 - **Management Network**: 192.168.88.0/24 (for SSH, web UI, control plane)
 - **VXLAN Network**: 10.172.88.0/24 (for VXLAN tunnel endpoints, MTU 9000)
 
-### Current Hosts:
+### Current Hosts (Persisted):
 1. **carmine** (localhost - 192.168.49.217)
    - Management IP: 192.168.49.217
-   - VXLAN IP: (using default IP)
-   - Switches: s1, s2 (connected to external controller at 192.168.88.192:6633)
+   - Type: localhost (auto-discovered on startup)
+   - Switches: s1, s2
 
-2. **ovs-3** (192.168.88.197)
-   - Management IP: 192.168.88.197
-   - VXLAN IP: 10.172.88.234 (ens34)
+2. **ovs-01** (192.168.88.194)
+   - Management IP: 192.168.88.194
+   - VXLAN IP: 10.172.88.232
    - Switches: br0
-   - MTU: 9000 on ens34
+   - DHCP Server: Running for DEVNET network
 
 3. **ovs-02** (192.168.88.195)
    - Management IP: 192.168.88.195
    - VXLAN IP: 10.172.88.233
    - Switches: br0
-   - Has existing VXLAN tunnels (vxlan100, vxlan101)
 
-4. **ovs-01** (192.168.88.194)
-   - Management IP: 192.168.88.194
-   - VXLAN IP: 10.172.88.232
+4. **ovs-3** (192.168.88.197)
+   - Management IP: 192.168.88.197
+   - VXLAN IP: 10.172.88.234
    - Switches: br0
-   - Has existing VXLAN tunnels (vxlan100, vxlan101)
+   - MTU: 9000 on ens34
 
 ---
 
-## Features Implemented in v0.7
+## Features Implemented in v0.7.1
 
-### DHCP Integration
+### Host Persistence (NEW!)
 
-**Goal**: Automatic IP assignment in overlay networks using dnsmasq
+**Problem Solved**: Previously, hosts were lost on server restart.
 
-**Features Implemented**:
+**Solution**: Hosts are now saved to `/tmp/recira-hosts.json` and automatically reconnected on startup.
+
+**How It Works**:
+1. When you add a host, credentials are saved to JSON file
+2. On server restart, OVSManager loads saved hosts
+3. Server automatically reconnects to each saved host via SSH
+4. Bridges are re-discovered and switches appear in UI
+
+**Files Changed**:
+- `backend/ovs_manager.py`:
+  - Added `_load_config()` - Load hosts on startup
+  - Added `_save_config()` - Save hosts when added
+  - Added `_reconnect_host()` - Reconnect to saved host
+  - Added `get_host_credentials()` - Get stored credentials
+  - Modified `discover_remote_host()` - Store password and save
+  - Modified `get_all_hosts()` - Filter out passwords from API
+
+- `backend/server.py`:
+  - Filter passwords from `/api/hosts/add` response
+  - Filter passwords from `/api/hosts/provision` response
+
+- `backend/dhcp_manager.py`:
+  - Uses `ovs_manager.get_host_credentials()` for stored passwords
+
+### DHCP Integration (v0.7.0)
+
+**Features**:
 - Enable/disable DHCP per network via web UI
 - Select which host runs the DHCP server
 - Configure DHCP scope (IP range, lease time, DNS servers)
@@ -69,130 +109,60 @@
 - View active DHCP leases
 - DHCP reservations (MAC -> IP mapping)
 
-#### Backend Changes:
+---
 
-**File: `backend/dhcp_manager.py`** (NEW)
-- `DHCPManager` class for managing DHCP services
-- `enable_dhcp()` - Enable DHCP for a network on a specific host
-- `disable_dhcp()` - Disable DHCP for a network
-- `get_dhcp_config()` - Get DHCP configuration
-- `get_dhcp_leases()` - Read active leases from dnsmasq
-- `add_reservation()` - Add MAC -> IP reservation
-- `delete_reservation()` - Remove reservation
-- Auto-installs dnsmasq if not present
-- Creates OVS internal port for gateway
-- Generates dnsmasq configuration file
-- Persists DHCP config to `/tmp/recira-dhcp.json`
+## Data Storage (All Persisted!)
 
-**File: `backend/server.py`**
-- Updated version to 0.7.0
-- Added `dhcp_manager` initialization
-- Added DHCP API endpoints:
-  - `POST /api/dhcp/enable` - Enable DHCP for network
-  - `POST /api/dhcp/disable` - Disable DHCP for network
-  - `GET /api/dhcp/config` - Get DHCP configuration
-  - `GET /api/dhcp/leases` - View active leases
-  - `POST /api/dhcp/reservation` - Add MAC reservation
-  - `POST /api/dhcp/reservation/delete` - Delete reservation
-- Updated `/api/networks` to include `dhcp_enabled` status
-- Updated `/api/networks/delete` to auto-disable DHCP
-- Added `SO_REUSEADDR` to avoid port reuse errors
+| Data | File | Survives Restart |
+|------|------|------------------|
+| Hosts | `/tmp/recira-hosts.json` | Yes |
+| Networks | `/tmp/recira-networks.json` | Yes |
+| DHCP | `/tmp/recira-dhcp.json` | Yes |
+| Tunnels | In-memory | No (but networks recreate them) |
 
-#### Frontend Changes:
-
-**File: `frontend/37734/index.html`**
-- Updated version to 0.7
-- Added DHCP column to networks table
-- Networks row shows:
-  - If DHCP enabled: "ON" badge + range + Leases button + Off button
-  - If DHCP disabled (with subnet): "Disabled" + Enable button
-  - If no subnet: "N/A - Need subnet"
-- Added "Enable DHCP" modal:
-  - Network name (read-only)
-  - DHCP server host selection dropdown
-  - DHCP range start/end inputs (auto-suggested from subnet)
-  - DNS servers input
-  - Lease time dropdown
-  - SSH password input
-- Added "DHCP Leases" modal:
-  - Table of active leases (IP, MAC, hostname, expiry)
-  - Refresh button
-- JavaScript functions:
-  - `showEnableDHCPModal()` - Show enable dialog
-  - `closeEnableDHCPModal()` - Close dialog
-  - `enableDHCP()` - Submit enable request
-  - `disableDHCP()` - Disable DHCP with confirmation
-  - `showDHCPLeases()` - Show leases modal
-  - `closeDHCPLeasesModal()` - Close leases
-  - `refreshDHCPLeases()` - Reload leases
+**Note**: Tunnels are stored as part of network config, so deleting and recreating a network will restore tunnels.
 
 ---
 
-## How to Use DHCP
+## Current Active Network
 
-### Prerequisites:
-1. Network must have subnet and gateway configured
-2. At least one host must be added to Recira
-
-### Enable DHCP for a Network:
-
-1. Open web UI: http://192.168.88.164:8080
-2. In the Networks table, find your network
-3. Click "Enable" button in the DHCP column
-4. In the modal:
-   - Select which host will run DHCP server
-   - DHCP range is auto-suggested based on gateway
-   - Optionally modify DNS servers and lease time
-   - Enter SSH password for the selected host
-5. Click "Enable DHCP"
-
-### View DHCP Leases:
-
-1. For networks with DHCP enabled, click "Leases" button
-2. View table of active leases:
-   - IP address assigned
-   - MAC address of client
-   - Hostname (if provided)
-   - Lease expiration time
-
-### Disable DHCP:
-
-1. Click "Off" button in the DHCP column
-2. Confirm the action
-3. Enter SSH password when prompted
-4. DHCP server will be stopped and gateway port removed
+**Network: DEVNET**
+- VNI: 1003
+- Subnet: 10.0.1.0/24
+- Gateway: 10.0.1.1
+- DHCP: Enabled on ovs-01 (192.168.88.194)
+- DHCP Range: 10.0.1.10 - 10.0.1.20
+- Switches: ovs-01, ovs-02, ovs-3 (full-mesh)
 
 ---
 
 ## API Endpoints
 
-### Existing Endpoints (unchanged):
+### Host Endpoints:
+- `GET /api/hosts` - List hosts (passwords hidden)
+- `POST /api/hosts/add` - Add host (saves credentials)
+- `POST /api/hosts/provision` - Auto-provision with OVS
+- `GET /api/hosts/health` - Host health status
+- `GET /api/hosts/scan-interfaces` - Scan interfaces
+
+### Network Endpoints:
+- `GET /api/networks` - List networks (includes DHCP status)
+- `POST /api/networks/create` - Create network
+- `POST /api/networks/delete` - Delete network
+
+### DHCP Endpoints:
+- `POST /api/dhcp/enable` - Enable DHCP
+- `POST /api/dhcp/disable` - Disable DHCP
+- `GET /api/dhcp/config?network_id=X` - Get config
+- `GET /api/dhcp/leases?network_id=X` - View leases
+- `POST /api/dhcp/reservation` - Add reservation
+- `POST /api/dhcp/reservation/delete` - Delete reservation
+
+### Other Endpoints:
 - `GET /api/status` - Controller status
 - `GET /api/switches` - Connected switches
-- `GET /api/hosts` - OVS hosts
-- `POST /api/hosts/add` - Add remote host
-- `POST /api/hosts/provision` - Auto-provision host
-- `GET /api/hosts/health` - Host health status
-- `GET /api/hosts/scan-interfaces` - Scan host interfaces
-- `GET /api/networks` - Virtual networks (now includes DHCP status)
-- `POST /api/networks/create` - Create network
-- `POST /api/networks/delete` - Delete network (auto-disables DHCP)
 - `GET /api/tunnels` - VXLAN tunnels
-- `POST /api/tunnels/create` - Create tunnel
-- `POST /api/tunnels/delete` - Delete tunnel
 - `GET /api/topology` - Network topology
-
-### New DHCP Endpoints (v0.7):
-- `POST /api/dhcp/enable` - Enable DHCP for network
-  - Body: `{network_id, host_ip, dhcp_start, dhcp_end, dns_servers?, lease_time?, password}`
-- `POST /api/dhcp/disable` - Disable DHCP for network
-  - Body: `{network_id, password?}`
-- `GET /api/dhcp/config?network_id=X` - Get DHCP configuration
-- `GET /api/dhcp/leases?network_id=X` - View active leases
-- `POST /api/dhcp/reservation` - Add DHCP reservation
-  - Body: `{network_id, mac, ip, hostname?, password?}`
-- `POST /api/dhcp/reservation/delete` - Delete reservation
-  - Body: `{network_id, mac, password?}`
 
 ---
 
@@ -201,107 +171,117 @@
 ```
 /root/vxlan-web-controller/
 ├── backend/
-│   ├── server.py              # Main HTTP server (v0.7)
-│   ├── ovs_manager.py         # OVS discovery and management
+│   ├── server.py              # Main HTTP server (v0.7.1)
+│   ├── ovs_manager.py         # OVS discovery + host persistence
 │   ├── vxlan_manager.py       # VXLAN tunnel creation
 │   ├── network_manager.py     # Virtual network management
-│   ├── host_provisioner.py    # Auto-provisioning and interface scanning
-│   └── dhcp_manager.py        # NEW - DHCP/dnsmasq management
+│   ├── host_provisioner.py    # Auto-provisioning
+│   └── dhcp_manager.py        # DHCP/dnsmasq management
 ├── frontend/37734/
-│   └── index.html             # Web UI (Dojo-based) v0.7
+│   └── index.html             # Web UI (Dojo-based)
+├── docs/
+│   └── ROADMAP.md             # Development roadmap
+├── README.md                  # Project documentation
 └── SESSION_CONTINUITY.md      # This file
 ```
 
 ---
 
-## Data Storage
-
-- **Networks**: `/tmp/recira-networks.json` (persisted)
-- **DHCP Configs**: `/tmp/recira-dhcp.json` (persisted) - NEW
-- **Hosts/Switches**: In-memory only (lost on server restart)
-- **Tunnels**: In-memory only (lost on server restart)
-
-**Note**: When server restarts, you need to re-add hosts through the UI.
-
----
-
 ## Troubleshooting
 
-### DHCP Not Starting:
+### Hosts Not Reconnecting on Restart:
 ```bash
-# Check if dnsmasq is installed
-ssh root@HOST_IP 'which dnsmasq'
+# Check hosts file exists
+cat /tmp/recira-hosts.json
 
-# Check dnsmasq status
-ssh root@HOST_IP 'systemctl status dnsmasq'
+# Check server log for reconnection messages
+tail -50 /tmp/recira-server.log | grep -i "reconnect"
 
-# Check dnsmasq config
-ssh root@HOST_IP 'cat /etc/dnsmasq.d/recira-network-*.conf'
-
-# Check logs
-ssh root@HOST_IP 'journalctl -u dnsmasq -n 50'
+# Verify SSH connectivity
+sshpass -p 'PASSWORD' ssh root@HOST_IP 'hostname'
 ```
 
-### No DHCP Leases:
-- Verify gateway port was created: `ovs-vsctl show`
-- Check if client is on the correct network/VLAN
-- Verify dnsmasq is listening: `ss -ulnp | grep dnsmasq`
+### DHCP Not Working:
+```bash
+# Check dnsmasq on DHCP host
+ssh root@192.168.88.194 'systemctl status dnsmasq'
 
-### DHCP Enable Button Not Showing:
-- Network must have both subnet AND gateway configured
-- Verify in network list that both fields have values
+# Check config file
+ssh root@192.168.88.194 'cat /etc/dnsmasq.d/recira-network-*.conf'
+
+# Check gateway port
+ssh root@192.168.88.194 'ovs-vsctl show | grep vni'
+ssh root@192.168.88.194 'ip addr show vni1003-gw'
+```
+
+### Network Tunnels Missing:
+- Delete and recreate the network (tunnels are created automatically)
+- Or manually check each host's OVS bridges
 
 ---
 
 ## Known Issues and Limitations
 
-1. **In-Memory Host Storage**: Hosts are lost on server restart
-2. **No Authentication**: Web UI has no login/authentication
+1. **Cleartext Passwords**: SSH credentials stored in plaintext (lab use only)
+2. **No Authentication**: Web UI has no login
 3. **No SSL/TLS**: Server runs on HTTP only
-4. **Single DHCP Server**: Each network can only have one DHCP server
-5. **No DHCP Failover**: No high-availability for DHCP
+4. **Single DHCP Server**: One DHCP server per network
+5. **No DHCP Failover**: No HA for DHCP
 
 ---
 
 ## Future Enhancements (Roadmap)
 
-- [x] v0.7 - DHCP Integration (COMPLETE)
+- [x] v0.7.0 - DHCP Integration (COMPLETE)
+- [x] v0.7.1 - Host Persistence (COMPLETE)
 - [ ] v0.8 - Port Management (assign ports to networks)
 - [ ] v0.9 - Visual Topology (D3.js network diagram)
 - [ ] v1.0 - OpenFlow Management
 - [ ] v1.1 - Statistics & Monitoring
 - [ ] v1.2 - KVM Integration
-- [ ] v1.3+ - Production Hardening (auth, TLS)
+- [ ] v1.3+ - Production Hardening (auth, TLS, encrypted credentials)
 
 ---
 
-## Quick Reference - SSH Credentials
+## Quick Reference
 
-**Current Hosts**:
-- All hosts use: `root` / `Xm9909ona`
-- Management Network: 192.168.88.0/24
-- VXLAN Network: 10.172.88.0/24
+### SSH Credentials:
+- All hosts: `root` / `Xm9909ona`
+
+### Networks:
+- Management: 192.168.88.0/24
+- VXLAN: 10.172.88.0/24
+- DEVNET Overlay: 10.0.1.0/24
+
+### Start Server:
+```bash
+cd /root/vxlan-web-controller
+python3 backend/server.py
+```
+
+### GitHub:
+https://github.com/bufanoc/recira
 
 ---
 
 ## Session Status
 
-**Last Updated**: 2025-11-25 10:00 UTC
+**Last Updated**: 2025-11-25 10:30 UTC
 
-### v0.7 DHCP Integration Complete
+### v0.7.1 Host Persistence Complete
 
-**New Files**:
-- `backend/dhcp_manager.py` - Full DHCP management module
+**Changes**:
+- Hosts now persist across server restarts
+- Credentials stored with hosts (cleartext for lab)
+- Auto-reconnect on startup
+- DHCP uses stored credentials automatically
+- API responses filter out passwords
+- Security warning added to README
 
-**Modified Files**:
-- `backend/server.py` - DHCP endpoints and initialization
-- `frontend/37734/index.html` - DHCP UI controls
-
-**Testing**:
-- Server starts successfully with DHCP manager
-- API endpoints return correct responses
-- Networks endpoint includes dhcp_enabled status
-- Frontend loads with DHCP controls
+**Verified**:
+- Added 3 hosts, restarted server, all 3 reconnected automatically
+- DHCP enabled on DEVNET network
+- All tunnels and bridges verified on all hosts
 
 ---
 
