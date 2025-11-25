@@ -113,6 +113,8 @@ class VXLANRequestHandler(http.server.SimpleHTTPRequestHandler):
                     'id': host['id'],
                     'hostname': host['hostname'],
                     'ip': host['ip'],
+                    'management_ip': host.get('management_ip', host['ip']),
+                    'vxlan_ip': host.get('vxlan_ip', host['ip']),
                     'type': host.get('type', 'unknown'),
                     'status': host.get('status', 'unknown'),
                     'ovs_version': host.get('ovs_version', 'unknown'),
