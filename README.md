@@ -10,9 +10,20 @@ Build and manage virtual overlay networks across multiple Linux hosts with a pro
 [![Python](https://img.shields.io/badge/python-3.6+-green.svg)](https://python.org)
 [![OVS](https://img.shields.io/badge/Open%20vSwitch-2.17+-orange.svg)](https://openvswitch.org)
 
-## Features (v0.7.0)
+> **WARNING: LAB/DEVELOPMENT USE ONLY**
+>
+> This software stores SSH credentials in **cleartext** for convenience in lab environments.
+> **Do NOT use in production** without implementing proper credential management (SSH keys, vault, etc.).
+>
+> Files containing sensitive data:
+> - `/tmp/recira-hosts.json` - Host SSH credentials (cleartext passwords)
+> - `/tmp/recira-dhcp.json` - DHCP configurations
+> - `/tmp/recira-networks.json` - Network configurations
 
-- **DHCP Integration (NEW!)** - Automatic IP assignment in overlay networks using dnsmasq
+## Features (v0.7.1)
+
+- **Host Persistence (NEW!)** - Hosts are now saved and auto-reconnect on restart
+- **DHCP Integration** - Automatic IP assignment in overlay networks using dnsmasq
 - **DHCP Leases Viewer** - View active DHCP leases from web UI
 - **DHCP Reservations** - Map MAC addresses to static IPs
 - **Host Auto-Provisioning** - Automatic OVS installation on Ubuntu/Debian/CentOS

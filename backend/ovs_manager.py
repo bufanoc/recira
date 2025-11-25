@@ -2,20 +2,193 @@
 """
 OVS Manager - Discovers and manages Open vSwitch bridges
 Supports both localhost and remote hosts via SSH
+
+v0.7.1 - Added host persistence (hosts saved to JSON file)
+
+WARNING: This version stores SSH credentials in cleartext.
+         For lab/development use only. Do not use in production.
 """
 
 import subprocess
 import json
 import re
+import os
 from typing import Dict, List, Optional, Tuple
+from datetime import datetime
 
 
 class OVSManager:
     """Manages OVS bridges on local and remote hosts"""
 
-    def __init__(self):
+    def __init__(self, config_file: str = '/tmp/recira-hosts.json'):
         self.hosts = {}  # {host_id: {hostname, ip, bridges, ...}}
         self.next_host_id = 1
+        self.config_file = config_file
+
+        # Load saved hosts on startup
+        self._load_config()
+
+    def _load_config(self):
+        """Load host configurations from JSON file and reconnect"""
+        if os.path.exists(self.config_file):
+            try:
+                with open(self.config_file, 'r') as f:
+                    data = json.load(f)
+
+                saved_hosts = data.get('hosts', {})
+                self.next_host_id = data.get('next_host_id', 1)
+
+                print(f"   Loading {len(saved_hosts)} saved host(s) from {self.config_file}")
+
+                # Reconnect to each saved host
+                for host_id_str, host_data in saved_hosts.items():
+                    host_type = host_data.get('type', 'remote')
+
+                    if host_type == 'localhost':
+                        # Localhost is auto-discovered, skip
+                        continue
+
+                    # Try to reconnect to remote host
+                    ip = host_data.get('management_ip') or host_data.get('ip')
+                    username = host_data.get('ssh_user', 'root')
+                    password = host_data.get('ssh_password')
+                    vxlan_ip = host_data.get('vxlan_ip')
+
+                    if ip and password:
+                        print(f"   Reconnecting to {host_data.get('hostname', ip)}...")
+                        # Use internal method to avoid incrementing ID
+                        self._reconnect_host(
+                            host_id=int(host_id_str),
+                            ip=ip,
+                            username=username,
+                            password=password,
+                            vxlan_ip=vxlan_ip,
+                            saved_hostname=host_data.get('hostname')
+                        )
+
+                # Update next_host_id to be higher than any loaded host
+                if self.hosts:
+                    max_id = max(self.hosts.keys())
+                    if max_id >= self.next_host_id:
+                        self.next_host_id = max_id + 1
+
+            except Exception as e:
+                print(f"   Warning: Error loading host config: {e}")
+        else:
+            print(f"   No saved host config found at {self.config_file}")
+
+    def _save_config(self):
+        """Save host configurations to JSON file"""
+        try:
+            # Prepare hosts for saving (include credentials)
+            hosts_to_save = {}
+            for host_id, host in self.hosts.items():
+                # Don't save localhost (it's auto-discovered)
+                if host.get('type') == 'localhost':
+                    continue
+
+                hosts_to_save[str(host_id)] = {
+                    'hostname': host.get('hostname'),
+                    'ip': host.get('ip'),
+                    'management_ip': host.get('management_ip'),
+                    'vxlan_ip': host.get('vxlan_ip'),
+                    'type': host.get('type'),
+                    'ssh_user': host.get('ssh_user', 'root'),
+                    'ssh_password': host.get('ssh_password'),  # WARNING: Cleartext!
+                    'ovs_version': host.get('ovs_version'),
+                    'saved_at': datetime.now().isoformat()
+                }
+
+            data = {
+                'hosts': hosts_to_save,
+                'next_host_id': self.next_host_id,
+                'last_updated': datetime.now().isoformat(),
+                'warning': 'CONTAINS CLEARTEXT PASSWORDS - LAB USE ONLY'
+            }
+
+            with open(self.config_file, 'w') as f:
+                json.dump(data, f, indent=2)
+
+            return True
+        except Exception as e:
+            print(f"Error saving host config: {e}")
+            return False
+
+    def _reconnect_host(self, host_id: int, ip: str, username: str,
+                        password: str, vxlan_ip: Optional[str] = None,
+                        saved_hostname: Optional[str] = None) -> bool:
+        """Reconnect to a previously saved host"""
+        try:
+            ssh_cmd = ['sshpass', '-p', password, 'ssh',
+                      '-o', 'StrictHostKeyChecking=no',
+                      '-o', 'ConnectTimeout=5',
+                      f'{username}@{ip}']
+
+            # Get hostname
+            try:
+                hostname = subprocess.check_output(
+                    ssh_cmd + ['hostname'],
+                    text=True,
+                    stderr=subprocess.DEVNULL,
+                    timeout=10
+                ).strip()
+            except:
+                hostname = saved_hostname or ip
+
+            # Get OVS version
+            try:
+                ovs_output = subprocess.check_output(
+                    ssh_cmd + ['ovs-vsctl', '--version'],
+                    text=True,
+                    stderr=subprocess.STDOUT,
+                    timeout=10
+                )
+                match = re.search(r'ovs-vsctl.*?(\d+\.\d+\.\d+)', ovs_output)
+                ovs_version = match.group(1) if match else 'unknown'
+            except:
+                ovs_version = 'unknown'
+
+            # Get bridges
+            bridges = []
+            try:
+                bridges_output = subprocess.check_output(
+                    ssh_cmd + ['ovs-vsctl', 'list-br'],
+                    text=True,
+                    timeout=10
+                ).strip()
+
+                if bridges_output:
+                    bridge_names = bridges_output.split('\n')
+                    for br_name in bridge_names:
+                        br_name = br_name.strip()
+                        if br_name:
+                            br_info = self._get_remote_bridge_details(ssh_cmd, br_name)
+                            if br_info:
+                                bridges.append(br_info)
+            except:
+                pass
+
+            host_info = {
+                'id': host_id,
+                'hostname': hostname,
+                'ip': ip,
+                'management_ip': ip,
+                'vxlan_ip': vxlan_ip if vxlan_ip else ip,
+                'type': 'remote',
+                'status': 'online',
+                'ovs_version': ovs_version,
+                'bridges': bridges,
+                'ssh_user': username,
+                'ssh_password': password  # Store for persistence
+            }
+
+            self.hosts[host_id] = host_info
+            print(f"      Reconnected to {hostname} ({ip}) - {len(bridges)} bridge(s)")
+            return True
+
+        except Exception as e:
+            print(f"      Failed to reconnect to {ip}: {e}")
+            return False
 
     def discover_localhost(self, vxlan_ip: Optional[str] = None) -> Dict:
         """
@@ -251,11 +424,15 @@ class OVSManager:
                 'status': 'online',
                 'ovs_version': ovs_version,
                 'bridges': bridges,
-                'ssh_user': username
+                'ssh_user': username,
+                'ssh_password': password  # Store for persistence (WARNING: cleartext!)
             }
 
             self.hosts[self.next_host_id] = host_info
             self.next_host_id += 1
+
+            # Save hosts to disk for persistence
+            self._save_config()
 
             return host_info
 
@@ -307,8 +484,20 @@ class OVSManager:
             return None
 
     def get_all_hosts(self) -> List[Dict]:
-        """Get all discovered hosts"""
-        return list(self.hosts.values())
+        """Get all discovered hosts (without exposing passwords)"""
+        hosts_list = []
+        for host in self.hosts.values():
+            # Create a copy without the password
+            host_copy = {k: v for k, v in host.items() if k != 'ssh_password'}
+            hosts_list.append(host_copy)
+        return hosts_list
+
+    def get_host_credentials(self, host_ip: str) -> Tuple[str, str]:
+        """Get stored credentials for a host (for internal use)"""
+        for host in self.hosts.values():
+            if host.get('ip') == host_ip or host.get('management_ip') == host_ip:
+                return host.get('ssh_user', 'root'), host.get('ssh_password', '')
+        return 'root', ''
 
     def get_all_switches(self) -> List[Dict]:
         """

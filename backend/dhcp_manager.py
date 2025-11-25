@@ -90,11 +90,8 @@ class DHCPManager:
 
     def _get_host_credentials(self, host_ip: str) -> Tuple[str, str]:
         """Get SSH credentials for a host from ovs_manager"""
-        hosts = self.ovs_manager.get_all_hosts()
-        for host in hosts:
-            if host.get('ip') == host_ip or host.get('management_ip') == host_ip:
-                return host.get('username', 'root'), host.get('password', '')
-        return 'root', ''
+        # Use the new get_host_credentials method that accesses stored passwords
+        return self.ovs_manager.get_host_credentials(host_ip)
 
     def _install_dnsmasq(self, host_ip: str, username: str, password: str) -> bool:
         """Install dnsmasq on host if not present"""

@@ -3,7 +3,7 @@
 VXLAN Web Controller - Backend Server with Real OVS Discovery
 Repurposed from DVSC for generic OVS/VXLAN management
 
-Version: 0.7.0 - DHCP Integration
+Version: 0.7.1 - Host Persistence + DHCP Integration
 """
 
 import http.server
@@ -82,7 +82,7 @@ class VXLANRequestHandler(http.server.SimpleHTTPRequestHandler):
 
             response = {
                 "status": "running",
-                "version": "0.7.0",
+                "version": "0.7.1",
                 "uptime": uptime_str,
                 "controller": "Recira - Virtual Network Platform",
                 "hosts": len(ovs_manager.get_all_hosts()),
@@ -374,10 +374,12 @@ class VXLANRequestHandler(http.server.SimpleHTTPRequestHandler):
                 )
 
                 if host_info:
+                    # Filter out password from response
+                    safe_host_info = {k: v for k, v in host_info.items() if k != 'ssh_password'}
                     response = {
                         "success": True,
                         "message": f"Successfully added {host_info['hostname']}",
-                        "host": host_info
+                        "host": safe_host_info
                     }
                 else:
                     response = {
@@ -417,11 +419,13 @@ class VXLANRequestHandler(http.server.SimpleHTTPRequestHandler):
                         vxlan_ip=vxlan_ip
                     )
 
+                    # Filter out password from response
+                    safe_host_info = {k: v for k, v in host_info.items() if k != 'ssh_password'} if host_info else None
                     response = {
                         "success": True,
                         "message": f"Host {ip} provisioned successfully",
                         "provision_details": provision_result,
-                        "host": host_info
+                        "host": safe_host_info
                     }
                 else:
                     response = {
@@ -536,7 +540,7 @@ def main():
     global vxlan_manager, network_manager, dhcp_manager
 
     print("\n" + "="*60)
-    print("🚀 Recira - Virtual Network Platform v0.7")
+    print("🚀 Recira - Virtual Network Platform v0.7.1")
     print("="*60)
     print(f"\n📁 Frontend directory: {FRONTEND_DIR}")
 
