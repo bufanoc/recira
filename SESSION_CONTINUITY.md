@@ -2,7 +2,7 @@
 
 **Date**: 2025-11-25
 **Version**: v0.7.2 - Visual Topology + Tunnel Discovery
-**Status**: Fully Functional
+**Status**: Troubleshooting DHCP / Underlay Network
 
 ---
 
@@ -30,11 +30,11 @@
 - DHCP server integration using dnsmasq
 - Host persistence (survives server restarts)
 - Tunnel discovery (auto-discovers existing VXLAN tunnels)
-- **NEW in v0.7.2**: Stunning visual topology with D3.js
+- Stunning visual topology with D3.js
 
 **Current Setup**:
 - Server running on: http://192.168.88.164:8080
-- Frontend: Dojo-based UI + D3.js Topology (repurposed from DVSC)
+- Frontend: Dojo-based UI + D3.js Topology
 - Backend: Python HTTP server with OVS integration
 - Version: 0.7.2
 
@@ -46,264 +46,118 @@
 - **Management Network**: 192.168.88.0/24 (for SSH, web UI, control plane)
 - **VXLAN Network**: 10.172.88.0/24 (for VXLAN tunnel endpoints, MTU 9000)
 
-### Current Hosts (Persisted):
-1. **carmine** (localhost - 192.168.49.217)
-   - Management IP: 192.168.49.217
-   - Type: localhost (auto-discovered on startup)
-   - Switches: s1, s2
+### Current Hosts (3 Remote + 1 Localhost):
 
-2. **ovs-01** (192.168.88.194)
-   - Management IP: 192.168.88.194
-   - VXLAN IP: 10.172.88.232
-   - Switches: br0
-   - DHCP Server: Running for DEVNET network
+| Host | Management IP | VXLAN IP | Bridge | Notes |
+|------|---------------|----------|--------|-------|
+| ovs-01 | 192.168.88.194 | 10.172.88.232 | br0 | DHCP server host |
+| ovs-02 | 192.168.88.195 | 10.172.88.233 | br0 | |
+| ovs-3 | 192.168.88.197 | 10.172.88.234 | br0 | MTU 9000 on ens34 |
+| carmine | 192.168.49.217 | N/A | (none) | Localhost, mininet removed |
 
-3. **ovs-02** (192.168.88.195)
-   - Management IP: 192.168.88.195
-   - VXLAN IP: 10.172.88.233
-   - Switches: br0
-
-4. **ovs-3** (192.168.88.197)
-   - Management IP: 192.168.88.197
-   - VXLAN IP: 10.172.88.234
-   - Switches: br0
-   - MTU: 9000 on ens34
+**Note**: Mininet bridges (s1, s2) were deleted from localhost. Carmine now shows 0 bridges.
 
 ---
 
-## Features Implemented in v0.7.2
+## Current Session Status
 
-### Visual Topology (NEW!)
+**Last Updated**: 2025-11-25 ~12:15 UTC
 
-**Stunning D3.js-powered network visualization showing your entire VXLAN fabric!**
+### What Was Done This Session:
 
-**Visual Elements**:
-- Dark gradient background with subtle grid pattern (space-like theme)
-- Purple gradient host nodes (servers) with hostname and VXLAN IP displayed
-- Blue circular switch nodes showing OVS bridge names
-- Animated curved tunnel lines with vibrant gradient colors per VNI
-- Dashed lines connecting hosts to their OVS switches
-- Glowing effects on all nodes
+1. **Cleaned up problematic networks**:
+   - Deleted INTERCONNECT network (had mininet switches)
+   - Deleted and recreated DEVNET with only real hosts (switches 1, 2, 3)
+   - Removed old dnsmasq config files from hosts
 
-**Interactivity**:
-- **Drag nodes** - Rearrange the layout to your liking
-- **Zoom/Pan** - Scroll to zoom, drag background to pan
-- **Hover tooltips** - Shows detailed info for hosts, switches, and tunnels
-- **Pause/Play** - Toggle the flowing animation on tunnel lines
-- **Reset** - Restore the force-directed layout
-- **Expand** - Make the visualization larger (500px -> 800px)
+2. **Removed mininet from localhost**:
+   ```bash
+   ovs-vsctl del-br s1
+   ovs-vsctl del-br s2
+   ```
 
-**Real-time Updates**:
-- Stats panel: Hosts, Switches, Tunnels, VNIs count
-- Legend dynamically shows VNI colors
-- Auto-refreshes when data changes (30-second interval)
+3. **Created DHCP test script**:
+   - Deployed to all 3 hosts as `/usr/local/bin/dhcp-test`
+   - Interactive script to test DHCP on any VNI
+   - Usage: `dhcp-test` (interactive) or `dhcp-test test 1003`
 
-**VNI Color Palette**:
-Each VNI gets a unique gradient color:
-- Blue (#00d2ff → #3a7bd5)
-- Pink-Red (#f857a6 → #ff5858)
-- Green (#11998e → #38ef7d)
-- Orange (#fc4a1a → #f7b733)
-- Purple (#8E2DE2 → #4A00E0)
-- And 5 more vibrant gradients!
+4. **DHCP Bug Found & Fixed**:
+   - Gateway port (vni1003-gw) was NOT tagged with VNI
+   - Fixed with: `ovs-vsctl set port vni1003-gw tag=1003`
+   - **This fix needs to be added to dhcp_manager.py**
 
-**Files Changed**:
-- `frontend/37734/index.html`:
-  - Added D3.js v7 library from CDN
-  - Added ~200 lines of CSS for topology styling
-  - Added ~500 lines of JavaScript for D3 visualization
-  - New topology container with controls, legend, stats
+5. **Underlay Network Issue Discovered**:
+   - DHCP still failing after gateway port fix
+   - Root cause: VXLAN underlay network (10.172.88.0/24) not reachable
+   - ovs-02 cannot ping ovs-01's VXLAN IP (10.172.88.232)
+   - **User is recreating tunnels/networks to fix this**
 
-### Tunnel Discovery (v0.7.2)
+### Current Network State:
 
-**Problem Solved**: Tunnels were lost on server restart (stored in-memory only).
-
-**Solution**: Tunnels are now auto-discovered by scanning OVS bridges on all hosts.
-
-**How It Works**:
-1. On startup, `vxlan_manager.discover_tunnels()` is called
-2. Scans all hosts' OVS bridges via SSH for VXLAN ports
-3. Parses VNI and remote_ip from port options
-4. Deduplicates bidirectional tunnels (same VNI between same hosts)
-5. Creates tunnel records in memory with status "up"
-
-**Files Changed**:
-- `backend/vxlan_manager.py`:
-  - Added `discover_tunnels()` - Main discovery method
-  - Added `_get_vxlan_ports()` - Parse OVS show output
-  - Added `_find_host_by_vxlan_ip()` - Lookup host by IP
-  - Added `_find_switch_on_host()` - Find switch by host/bridge
-  - Updated `_build_ssh_cmd()` - Uses stored credentials
-
-- `backend/server.py`:
-  - Calls `discover_tunnels()` during initialization
-  - Version updated to 0.7.2
-
----
-
-## Previous Features
-
-### Host Persistence (v0.7.1)
-- Hosts saved to `/tmp/recira-hosts.json`
-- Auto-reconnect on server restart
-- Credentials stored with hosts
-
-### DHCP Integration (v0.7.0)
-- Enable/disable DHCP per network
-- dnsmasq configuration
-- Leases viewer and reservations
-
----
-
-## Data Storage (All Persisted!)
-
-| Data | File | Survives Restart |
-|------|------|------------------|
-| Hosts | `/tmp/recira-hosts.json` | Yes |
-| Networks | `/tmp/recira-networks.json` | Yes |
-| DHCP | `/tmp/recira-dhcp.json` | Yes |
-| Tunnels | Discovered from OVS | Yes (via discovery) |
-
----
-
-## Current Active Network
-
-**Network: DEVNET**
+**DEVNET** (Network ID: 7):
 - VNI: 1003
 - Subnet: 10.0.1.0/24
 - Gateway: 10.0.1.1
 - DHCP: Enabled on ovs-01 (192.168.88.194)
-- DHCP Range: 10.0.1.10 - 10.0.1.20
-- Switches: ovs-01, ovs-02, ovs-3 (full-mesh)
-
-**Current Statistics**:
-- 4 Hosts
-- 5 Switches
-- 14 Tunnels
-- 9 Unique VNIs
+- DHCP Range: 10.0.1.10 - 10.0.1.100
+- Switches: 1, 2, 3 (ovs-01, ovs-02, ovs-3)
 
 ---
 
-## API Endpoints
+## Pending Issues to Fix
 
-### Host Endpoints:
-- `GET /api/hosts` - List hosts (passwords hidden)
-- `POST /api/hosts/add` - Add host (saves credentials)
-- `POST /api/hosts/provision` - Auto-provision with OVS
-- `GET /api/hosts/health` - Host health status
-- `GET /api/hosts/scan-interfaces` - Scan interfaces
+### 1. DHCP Manager Bug - Gateway Port Tagging
+**File**: `backend/dhcp_manager.py`
 
-### Network Endpoints:
-- `GET /api/networks` - List networks (includes DHCP status)
-- `POST /api/networks/create` - Create network
-- `POST /api/networks/delete` - Delete network
-
-### Tunnel Endpoints:
-- `GET /api/tunnels` - VXLAN tunnels (now persisted via discovery!)
-- `POST /api/tunnels/create` - Create tunnel
-- `POST /api/tunnels/delete` - Delete tunnel
-
-### DHCP Endpoints:
-- `POST /api/dhcp/enable` - Enable DHCP
-- `POST /api/dhcp/disable` - Disable DHCP
-- `GET /api/dhcp/config?network_id=X` - Get config
-- `GET /api/dhcp/leases?network_id=X` - View leases
-- `POST /api/dhcp/reservation` - Add reservation
-- `POST /api/dhcp/reservation/delete` - Delete reservation
-
-### Other Endpoints:
-- `GET /api/status` - Controller status
-- `GET /api/switches` - Connected switches
-- `GET /api/topology` - Network topology
-
----
-
-## File Structure
-
-```
-/root/vxlan-web-controller/
-├── backend/
-│   ├── server.py              # Main HTTP server (v0.7.2)
-│   ├── ovs_manager.py         # OVS discovery + host persistence
-│   ├── vxlan_manager.py       # VXLAN tunnel creation + discovery
-│   ├── network_manager.py     # Virtual network management
-│   ├── host_provisioner.py    # Auto-provisioning
-│   └── dhcp_manager.py        # DHCP/dnsmasq management
-├── frontend/37734/
-│   └── index.html             # Web UI (Dojo + D3.js topology)
-├── docs/
-│   └── ROADMAP.md             # Development roadmap
-├── README.md                  # Project documentation
-└── SESSION_CONTINUITY.md      # This file
+When enabling DHCP, the gateway port needs to be tagged with the VNI:
+```python
+# After creating the gateway port, add:
+ovs-vsctl set port {port_name} tag={vni}
 ```
 
+### 2. Underlay Network Connectivity
+The VXLAN underlay network (10.172.88.0/24) needs to be verified:
+- Check that each host has the correct VXLAN IP on the correct interface
+- Verify routing between hosts on this network
+- May need to recreate tunnels with correct remote_ip settings
+
 ---
 
-## Troubleshooting
+## DHCP Test Script
 
-### Topology Not Showing:
+Installed on all 3 hosts at `/usr/local/bin/dhcp-test`
+
+**Usage:**
 ```bash
-# Check D3.js is loading (browser console)
-# Should see no errors related to d3
+# Interactive mode
+dhcp-test
 
-# Check API returns data
-curl http://localhost:8080/api/hosts
-curl http://localhost:8080/api/switches
-curl http://localhost:8080/api/tunnels
+# Quick test
+dhcp-test test 1003
+
+# Other commands
+dhcp-test list      # List available VNIs
+dhcp-test status    # Show test interface status
+dhcp-test cleanup   # Remove test interface
+dhcp-test help      # Show help
 ```
 
-### Tunnels Not Discovered:
-```bash
-# Check server log
-tail -20 /tmp/recira-server.log | grep -i "tunnel"
-
-# Should see: "Discovered X existing tunnel(s)"
-
-# Verify VXLAN ports exist on hosts
-ssh root@192.168.88.194 'ovs-vsctl show | grep vxlan'
-```
-
-### Hosts Not Reconnecting on Restart:
-```bash
-# Check hosts file exists
-cat /tmp/recira-hosts.json
-
-# Check server log for reconnection messages
-tail -50 /tmp/recira-server.log | grep -i "reconnect"
-```
-
-### DHCP Not Working:
-```bash
-# Check dnsmasq on DHCP host
-ssh root@192.168.88.194 'systemctl status dnsmasq'
-
-# Check config file
-ssh root@192.168.88.194 'cat /etc/dnsmasq.d/recira-network-*.conf'
-```
+**What it does:**
+1. Creates OVS internal port tagged with VNI
+2. Runs dhclient to request DHCP
+3. Shows DHCP handshake in real-time
+4. Reports success/failure with IP
+5. Cleans up when done
 
 ---
 
-## Known Issues and Limitations
+## DHCP Architecture Notes
 
-1. **Cleartext Passwords**: SSH credentials stored in plaintext (lab use only)
-2. **No Authentication**: Web UI has no login
-3. **No SSL/TLS**: Server runs on HTTP only
-4. **Single DHCP Server**: One DHCP server per network
-5. **No DHCP Failover**: No HA for DHCP
+**Q: Is dnsmasq using network namespaces?**
+A: No - dnsmasq runs in default namespace, binds to OVS internal port via `interface=` directive
 
----
-
-## Future Enhancements (Roadmap)
-
-- [x] v0.7.0 - DHCP Integration (COMPLETE)
-- [x] v0.7.1 - Host Persistence (COMPLETE)
-- [x] v0.7.2 - Tunnel Discovery (COMPLETE)
-- [x] v0.7.2 - Visual Topology (COMPLETE) - Originally planned for v0.9!
-- [ ] v0.8 - Port Management (assign ports to networks)
-- [ ] v1.0 - OpenFlow Management
-- [ ] v1.1 - Statistics & Monitoring
-- [ ] v1.2 - KVM Integration
-- [ ] v1.3+ - Production Hardening (auth, TLS, encrypted credentials)
+**Q: Can one host run DHCP for multiple networks?**
+A: Yes! Each network gets its own config file in `/etc/dnsmasq.d/recira-network-X.conf`
 
 ---
 
@@ -314,7 +168,7 @@ ssh root@192.168.88.194 'cat /etc/dnsmasq.d/recira-network-*.conf'
 
 ### Networks:
 - Management: 192.168.88.0/24
-- VXLAN: 10.172.88.0/24
+- VXLAN Underlay: 10.172.88.0/24
 - DEVNET Overlay: 10.0.1.0/24
 
 ### Start Server:
@@ -323,40 +177,43 @@ cd /root/vxlan-web-controller
 python3 backend/server.py
 ```
 
+### Test DHCP:
+```bash
+ssh root@192.168.88.195 'dhcp-test test 1003'
+```
+
 ### GitHub:
 https://github.com/bufanoc/recira
 
 ---
 
-## Session Status
+## Next Steps (When Resuming)
 
-**Last Updated**: 2025-11-25 11:00 UTC
+1. **User is recreating tunnels/networks** - wait for completion
+2. **Verify underlay connectivity**:
+   ```bash
+   # From ovs-02, ping ovs-01 VXLAN IP
+   ssh root@192.168.88.195 'ping -c 3 10.172.88.232'
+   ```
+3. **Test DHCP again**:
+   ```bash
+   ssh root@192.168.88.195 'dhcp-test test 1003'
+   ```
+4. **Fix dhcp_manager.py** to tag gateway port with VNI
+5. **Continue with v0.8 Port Management** once DHCP is verified
 
-### v0.7.2 Visual Topology + Tunnel Discovery Complete
+---
 
-**Major Additions**:
-1. **Stunning D3.js Topology Visualization**
-   - Force-directed graph layout
-   - Animated gradient tunnel lines
-   - Interactive drag, zoom, pan
-   - Hover tooltips with details
-   - Real-time stats display
-   - VNI color-coded legend
+## Roadmap Summary
 
-2. **Tunnel Discovery**
-   - Auto-discovers existing VXLAN ports on startup
-   - Scans all OVS bridges on all hosts
-   - Deduplicates bidirectional tunnels
-   - Uses stored SSH credentials
-   - 14 tunnels discovered automatically
-
-**Verified**:
-- Topology displays all 4 hosts, 5 switches, 14 tunnels
-- Animation flows smoothly on tunnel lines
-- Tooltips show correct data
-- Zoom/pan/drag all working
-- Real-time updates when data changes
-- Tunnels persist across server restarts via discovery
+| Version | Feature | Status |
+|---------|---------|--------|
+| v0.7.2 | Visual Topology | Complete |
+| v0.8 | Port Management | Next |
+| v1.0 | OpenFlow | Planned |
+| v1.1 | Monitoring | Planned |
+| v1.2 | KVM Integration | Planned |
+| v1.3 | Windows Support | Future |
 
 ---
 
