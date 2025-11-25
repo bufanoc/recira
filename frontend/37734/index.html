@@ -234,21 +234,282 @@
         .btn-danger:hover {
             background: #c0392b;
         }
+
+        /* Topology Visualization Styles */
+        .topology-container {
+            position: relative;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            border-radius: 12px;
+            overflow: hidden;
+            min-height: 500px;
+        }
+
+        .topology-header {
+            position: absolute;
+            top: 15px;
+            left: 20px;
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .topology-title {
+            color: #fff;
+            font-size: 18px;
+            font-weight: 600;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .topology-controls {
+            position: absolute;
+            top: 15px;
+            right: 20px;
+            z-index: 10;
+            display: flex;
+            gap: 8px;
+        }
+
+        .topo-btn {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: #fff;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+
+        .topo-btn:hover {
+            background: rgba(255,255,255,0.2);
+            border-color: rgba(255,255,255,0.4);
+        }
+
+        .topo-btn.active {
+            background: #3498db;
+            border-color: #3498db;
+        }
+
+        .topology-legend {
+            position: absolute;
+            bottom: 15px;
+            left: 20px;
+            z-index: 10;
+            background: rgba(0,0,0,0.6);
+            padding: 12px 16px;
+            border-radius: 8px;
+            backdrop-filter: blur(10px);
+        }
+
+        .legend-title {
+            color: #fff;
+            font-size: 11px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .legend-items {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: rgba(255,255,255,0.8);
+            font-size: 11px;
+        }
+
+        .legend-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 3px;
+        }
+
+        .legend-line {
+            width: 24px;
+            height: 3px;
+            border-radius: 2px;
+        }
+
+        .topology-stats {
+            position: absolute;
+            bottom: 15px;
+            right: 20px;
+            z-index: 10;
+            display: flex;
+            gap: 20px;
+        }
+
+        .topo-stat {
+            text-align: center;
+            color: #fff;
+        }
+
+        .topo-stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            background: linear-gradient(135deg, #00d2ff, #3a7bd5);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .topo-stat-label {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            opacity: 0.7;
+        }
+
+        #topology-svg {
+            width: 100%;
+            height: 500px;
+        }
+
+        /* Node styles */
+        .node-host {
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .node-host:hover {
+            filter: brightness(1.2);
+        }
+
+        .node-switch {
+            cursor: pointer;
+        }
+
+        .node-switch:hover {
+            filter: brightness(1.3);
+        }
+
+        .node-label {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            font-size: 11px;
+            fill: #fff;
+            text-anchor: middle;
+            pointer-events: none;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+        }
+
+        .node-sublabel {
+            font-size: 9px;
+            fill: rgba(255,255,255,0.6);
+        }
+
+        /* Tunnel link styles */
+        .tunnel-link {
+            fill: none;
+            stroke-linecap: round;
+            opacity: 0.8;
+            transition: opacity 0.2s, stroke-width 0.2s;
+        }
+
+        .tunnel-link:hover {
+            opacity: 1;
+            stroke-width: 4px !important;
+        }
+
+        .tunnel-link-bg {
+            fill: none;
+            stroke: rgba(255,255,255,0.1);
+            stroke-width: 8px;
+            stroke-linecap: round;
+        }
+
+        /* Tooltip */
+        .topo-tooltip {
+            position: absolute;
+            background: rgba(0,0,0,0.9);
+            color: #fff;
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 12px;
+            pointer-events: none;
+            z-index: 100;
+            max-width: 280px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+            border: 1px solid rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .topo-tooltip.visible {
+            opacity: 1;
+        }
+
+        .tooltip-title {
+            font-weight: 600;
+            margin-bottom: 8px;
+            padding-bottom: 6px;
+            border-bottom: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .tooltip-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 4px 0;
+        }
+
+        .tooltip-label {
+            color: rgba(255,255,255,0.6);
+        }
+
+        .tooltip-value {
+            color: #fff;
+            font-family: 'Monaco', 'Consolas', monospace;
+        }
+
+        /* Animated gradient for tunnels */
+        @keyframes flowAnimation {
+            0% { stroke-dashoffset: 20; }
+            100% { stroke-dashoffset: 0; }
+        }
+
+        .tunnel-animated {
+            stroke-dasharray: 10 5;
+            animation: flowAnimation 1s linear infinite;
+        }
+
+        /* Pulse animation for active nodes */
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.8; transform: scale(1.05); }
+        }
+
+        .node-active {
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        /* Glow effect */
+        .glow {
+            filter: drop-shadow(0 0 8px currentColor);
+        }
     </style>
 
     <script src="dojo/dojo.js" data-dojo-config="async: true"></script>
+    <!-- D3.js for topology visualization -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
 </head>
 <body class="claro">
     <div id="loading">
         <div style="font-size: 48px; margin-bottom: 20px;">🚀</div>
         <div>Loading Recira...</div>
-        <div style="font-size: 14px; margin-top: 10px; color: #7f8c8d;">v0.7 - DHCP Integration</div>
+        <div style="font-size: 14px; margin-top: 10px; color: #7f8c8d;">v0.7.2 - Visual Topology</div>
     </div>
 
     <div id="app-container">
         <div class="header">
             <h1>🌐 Recira - Virtual Network Platform</h1>
-            <div class="subtitle">Open Source SDN Platform for VXLAN Overlay Networks • v0.7</div>
+            <div class="subtitle">Open Source SDN Platform for VXLAN Overlay Networks • v0.7.2</div>
         </div>
 
         <div class="content">
@@ -305,6 +566,64 @@
                 <button class="btn" onclick="showCreateTunnelModal()">🔗 Create Tunnel</button>
                 <button class="btn" onclick="refreshData()">🔄 Refresh Data</button>
                 <button class="btn" onclick="window.location.href='/api/status'">📡 View API</button>
+            </div>
+
+            <!-- Network Topology Visualization -->
+            <div class="card" style="margin-bottom: 20px; padding: 0; overflow: hidden;">
+                <div class="topology-container" id="topology-container">
+                    <div class="topology-header">
+                        <span class="topology-title">🗺️ VXLAN Overlay Topology</span>
+                        <span style="color: rgba(255,255,255,0.5); font-size: 11px;">Real-time Network View</span>
+                    </div>
+
+                    <div class="topology-controls">
+                        <button class="topo-btn active" onclick="setTopologyView('all')" id="view-all">All VNIs</button>
+                        <button class="topo-btn" onclick="toggleAnimation()" id="btn-animate">⏸️ Pause</button>
+                        <button class="topo-btn" onclick="resetTopology()">🔄 Reset</button>
+                        <button class="topo-btn" onclick="toggleFullscreen()">⛶ Expand</button>
+                    </div>
+
+                    <svg id="topology-svg"></svg>
+
+                    <div class="topology-legend" id="topology-legend">
+                        <div class="legend-title">Legend</div>
+                        <div class="legend-items">
+                            <div class="legend-item">
+                                <div class="legend-color" style="background: linear-gradient(135deg, #667eea, #764ba2);"></div>
+                                <span>Host Server</span>
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-color" style="background: #3498db; border-radius: 50%;"></div>
+                                <span>OVS Bridge</span>
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-line tunnel-animated" style="background: linear-gradient(90deg, #00d2ff, #3a7bd5);"></div>
+                                <span>VXLAN Tunnel</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="topology-stats">
+                        <div class="topo-stat">
+                            <div class="topo-stat-value" id="topo-hosts">0</div>
+                            <div class="topo-stat-label">Hosts</div>
+                        </div>
+                        <div class="topo-stat">
+                            <div class="topo-stat-value" id="topo-switches">0</div>
+                            <div class="topo-stat-label">Switches</div>
+                        </div>
+                        <div class="topo-stat">
+                            <div class="topo-stat-value" id="topo-tunnels">0</div>
+                            <div class="topo-stat-label">Tunnels</div>
+                        </div>
+                        <div class="topo-stat">
+                            <div class="topo-stat-value" id="topo-vnis">0</div>
+                            <div class="topo-stat-label">VNIs</div>
+                        </div>
+                    </div>
+
+                    <div class="topo-tooltip" id="topo-tooltip"></div>
+                </div>
             </div>
 
             <!-- Switches Table -->
@@ -1492,6 +1811,543 @@
 
         // Auto-refresh every 30 seconds
         setInterval(loadData, 30000);
+
+        // ============ TOPOLOGY VISUALIZATION (D3.js) ============
+
+        // Global topology state
+        let topoSimulation = null;
+        let topoSvg = null;
+        let topoG = null;
+        let topoAnimated = true;
+        let topoCurrentView = 'all';
+        let topoData = { nodes: [], links: [] };
+        let topoHosts = [];
+        let topoTunnels = [];
+        let topoSwitches = [];
+
+        // VNI color palette - vibrant gradients
+        const vniColors = [
+            { start: '#00d2ff', end: '#3a7bd5' },  // Blue
+            { start: '#f857a6', end: '#ff5858' },  // Pink-Red
+            { start: '#11998e', end: '#38ef7d' },  // Green
+            { start: '#fc4a1a', end: '#f7b733' },  // Orange
+            { start: '#8E2DE2', end: '#4A00E0' },  // Purple
+            { start: '#00c6ff', end: '#0072ff' },  // Light Blue
+            { start: '#f093fb', end: '#f5576c' },  // Pink
+            { start: '#4facfe', end: '#00f2fe' },  // Cyan
+            { start: '#43e97b', end: '#38f9d7' },  // Mint
+            { start: '#fa709a', end: '#fee140' },  // Sunset
+        ];
+
+        function getVNIColor(vni) {
+            const index = vni % vniColors.length;
+            return vniColors[index];
+        }
+
+        // Initialize topology visualization
+        function initTopology() {
+            const container = document.getElementById('topology-container');
+            const width = container.clientWidth;
+            const height = 500;
+
+            // Clear existing
+            d3.select('#topology-svg').selectAll('*').remove();
+
+            topoSvg = d3.select('#topology-svg')
+                .attr('width', width)
+                .attr('height', height);
+
+            // Add gradient definitions
+            const defs = topoSvg.append('defs');
+
+            // Host gradient
+            const hostGrad = defs.append('linearGradient')
+                .attr('id', 'hostGradient')
+                .attr('x1', '0%').attr('y1', '0%')
+                .attr('x2', '100%').attr('y2', '100%');
+            hostGrad.append('stop').attr('offset', '0%').attr('stop-color', '#667eea');
+            hostGrad.append('stop').attr('offset', '100%').attr('stop-color', '#764ba2');
+
+            // Glow filter
+            const glow = defs.append('filter')
+                .attr('id', 'glow')
+                .attr('x', '-50%').attr('y', '-50%')
+                .attr('width', '200%').attr('height', '200%');
+            glow.append('feGaussianBlur').attr('stdDeviation', '3').attr('result', 'coloredBlur');
+            const feMerge = glow.append('feMerge');
+            feMerge.append('feMergeNode').attr('in', 'coloredBlur');
+            feMerge.append('feMergeNode').attr('in', 'SourceGraphic');
+
+            // Create main group with zoom
+            topoG = topoSvg.append('g').attr('class', 'topology-main');
+
+            // Add zoom behavior
+            const zoom = d3.zoom()
+                .scaleExtent([0.3, 3])
+                .on('zoom', (event) => {
+                    topoG.attr('transform', event.transform);
+                });
+
+            topoSvg.call(zoom);
+
+            // Add grid pattern background
+            const gridPattern = defs.append('pattern')
+                .attr('id', 'grid')
+                .attr('width', 40)
+                .attr('height', 40)
+                .attr('patternUnits', 'userSpaceOnUse');
+            gridPattern.append('circle')
+                .attr('cx', 20).attr('cy', 20).attr('r', 1)
+                .attr('fill', 'rgba(255,255,255,0.05)');
+
+            topoSvg.insert('rect', ':first-child')
+                .attr('width', '100%')
+                .attr('height', '100%')
+                .attr('fill', 'url(#grid)');
+
+            loadTopologyData();
+        }
+
+        // Load and process topology data
+        function loadTopologyData() {
+            Promise.all([
+                fetch('/api/hosts').then(r => r.json()),
+                fetch('/api/switches').then(r => r.json()),
+                fetch('/api/tunnels').then(r => r.json())
+            ]).then(([hostsData, switchesData, tunnelsData]) => {
+                topoHosts = hostsData.hosts || [];
+                topoSwitches = switchesData.switches || [];
+                topoTunnels = tunnelsData.tunnels || [];
+
+                processTopologyData();
+                renderTopology();
+                updateTopologyStats();
+            }).catch(err => {
+                console.error('Error loading topology data:', err);
+            });
+        }
+
+        // Process raw data into D3 nodes and links
+        function processTopologyData() {
+            const nodes = [];
+            const links = [];
+            const hostPositions = {};
+
+            // Create host nodes
+            topoHosts.forEach((host, index) => {
+                const hostId = `host-${host.id}`;
+                nodes.push({
+                    id: hostId,
+                    type: 'host',
+                    label: host.hostname,
+                    ip: host.ip,
+                    vxlanIp: host.vxlan_ip || host.ip,
+                    data: host,
+                    fx: null,
+                    fy: null
+                });
+                hostPositions[host.id] = hostId;
+            });
+
+            // Create switch nodes
+            topoSwitches.forEach((sw, index) => {
+                const switchId = `switch-${sw.id}`;
+                const hostId = hostPositions[sw.host_id];
+
+                nodes.push({
+                    id: switchId,
+                    type: 'switch',
+                    label: sw.name,
+                    hostname: sw.hostname,
+                    hostIp: sw.host,
+                    dpid: sw.dpid,
+                    ports: sw.ports,
+                    parentHost: hostId,
+                    data: sw
+                });
+
+                // Link switch to its host
+                if (hostId) {
+                    links.push({
+                        source: hostId,
+                        target: switchId,
+                        type: 'host-switch',
+                        vni: null
+                    });
+                }
+            });
+
+            // Create tunnel links between switches
+            const switchMap = {};
+            topoSwitches.forEach(sw => {
+                // Map by hostname and switch name for lookup
+                const key = `${sw.hostname}-${sw.name}`;
+                switchMap[key] = `switch-${sw.id}`;
+            });
+
+            topoTunnels.forEach(tunnel => {
+                const srcKey = `${tunnel.src_host}-${tunnel.src_switch_name}`;
+                const dstKey = `${tunnel.dst_host}-${tunnel.dst_switch_name}`;
+                const srcId = switchMap[srcKey];
+                const dstId = switchMap[dstKey];
+
+                if (srcId && dstId) {
+                    links.push({
+                        source: srcId,
+                        target: dstId,
+                        type: 'tunnel',
+                        vni: tunnel.vni,
+                        srcIp: tunnel.src_vxlan_ip,
+                        dstIp: tunnel.dst_vxlan_ip,
+                        status: tunnel.status,
+                        data: tunnel
+                    });
+                }
+            });
+
+            topoData = { nodes, links };
+        }
+
+        // Render the topology with D3
+        function renderTopology() {
+            const container = document.getElementById('topology-container');
+            const width = container.clientWidth;
+            const height = 500;
+
+            // Create gradient definitions for each unique VNI
+            const defs = topoSvg.select('defs');
+            const uniqueVnis = [...new Set(topoData.links.filter(l => l.type === 'tunnel').map(l => l.vni))];
+
+            uniqueVnis.forEach(vni => {
+                const color = getVNIColor(vni);
+                const gradId = `vni-grad-${vni}`;
+
+                if (!defs.select(`#${gradId}`).node()) {
+                    const grad = defs.append('linearGradient')
+                        .attr('id', gradId)
+                        .attr('gradientUnits', 'userSpaceOnUse');
+                    grad.append('stop').attr('offset', '0%').attr('stop-color', color.start);
+                    grad.append('stop').attr('offset', '100%').attr('stop-color', color.end);
+                }
+            });
+
+            // Update legend with VNI colors
+            updateLegendVnis(uniqueVnis);
+
+            // Create force simulation
+            topoSimulation = d3.forceSimulation(topoData.nodes)
+                .force('link', d3.forceLink(topoData.links).id(d => d.id).distance(d => {
+                    if (d.type === 'host-switch') return 60;
+                    return 200;
+                }).strength(d => {
+                    if (d.type === 'host-switch') return 1;
+                    return 0.3;
+                }))
+                .force('charge', d3.forceManyBody().strength(d => {
+                    if (d.type === 'host') return -400;
+                    return -150;
+                }))
+                .force('center', d3.forceCenter(width / 2, height / 2))
+                .force('collision', d3.forceCollide().radius(d => d.type === 'host' ? 60 : 30));
+
+            // Draw links (tunnels first, then host-switch connections)
+            const linkGroup = topoG.append('g').attr('class', 'links');
+
+            // Tunnel links with gradients
+            const tunnelLinks = linkGroup.selectAll('.tunnel-link-group')
+                .data(topoData.links.filter(l => l.type === 'tunnel'))
+                .enter()
+                .append('g')
+                .attr('class', 'tunnel-link-group');
+
+            tunnelLinks.append('path')
+                .attr('class', 'tunnel-link-bg');
+
+            tunnelLinks.append('path')
+                .attr('class', d => `tunnel-link ${topoAnimated ? 'tunnel-animated' : ''}`)
+                .attr('stroke', d => `url(#vni-grad-${d.vni})`)
+                .attr('stroke-width', 2.5)
+                .on('mouseover', showTunnelTooltip)
+                .on('mouseout', hideTooltip);
+
+            // Host-switch links
+            const hostSwitchLinks = linkGroup.selectAll('.host-switch-link')
+                .data(topoData.links.filter(l => l.type === 'host-switch'))
+                .enter()
+                .append('line')
+                .attr('class', 'host-switch-link')
+                .attr('stroke', 'rgba(255,255,255,0.2)')
+                .attr('stroke-width', 2)
+                .attr('stroke-dasharray', '4,4');
+
+            // Draw nodes
+            const nodeGroup = topoG.append('g').attr('class', 'nodes');
+
+            // Host nodes (larger rectangles with rounded corners)
+            const hostNodes = nodeGroup.selectAll('.node-host')
+                .data(topoData.nodes.filter(n => n.type === 'host'))
+                .enter()
+                .append('g')
+                .attr('class', 'node-host')
+                .call(d3.drag()
+                    .on('start', dragStarted)
+                    .on('drag', dragged)
+                    .on('end', dragEnded))
+                .on('mouseover', showHostTooltip)
+                .on('mouseout', hideTooltip);
+
+            hostNodes.append('rect')
+                .attr('width', 80)
+                .attr('height', 50)
+                .attr('x', -40)
+                .attr('y', -25)
+                .attr('rx', 8)
+                .attr('fill', 'url(#hostGradient)')
+                .attr('filter', 'url(#glow)');
+
+            hostNodes.append('text')
+                .attr('class', 'node-label')
+                .attr('dy', -5)
+                .text(d => d.label);
+
+            hostNodes.append('text')
+                .attr('class', 'node-label node-sublabel')
+                .attr('dy', 10)
+                .text(d => d.vxlanIp);
+
+            // Server icon
+            hostNodes.append('text')
+                .attr('x', 28)
+                .attr('y', -12)
+                .attr('font-size', '14px')
+                .text('🖥️');
+
+            // Switch nodes (circles)
+            const switchNodes = nodeGroup.selectAll('.node-switch')
+                .data(topoData.nodes.filter(n => n.type === 'switch'))
+                .enter()
+                .append('g')
+                .attr('class', 'node-switch')
+                .call(d3.drag()
+                    .on('start', dragStarted)
+                    .on('drag', dragged)
+                    .on('end', dragEnded))
+                .on('mouseover', showSwitchTooltip)
+                .on('mouseout', hideTooltip);
+
+            switchNodes.append('circle')
+                .attr('r', 20)
+                .attr('fill', '#3498db')
+                .attr('stroke', '#fff')
+                .attr('stroke-width', 2)
+                .attr('filter', 'url(#glow)');
+
+            switchNodes.append('text')
+                .attr('class', 'node-label')
+                .attr('dy', 4)
+                .text(d => d.label);
+
+            // Update positions on tick
+            topoSimulation.on('tick', () => {
+                // Update tunnel links as curves
+                tunnelLinks.selectAll('path').attr('d', d => {
+                    const dx = d.target.x - d.source.x;
+                    const dy = d.target.y - d.source.y;
+                    const dr = Math.sqrt(dx * dx + dy * dy) * 0.8;
+                    return `M${d.source.x},${d.source.y}A${dr},${dr} 0 0,1 ${d.target.x},${d.target.y}`;
+                });
+
+                // Update host-switch links
+                hostSwitchLinks
+                    .attr('x1', d => d.source.x)
+                    .attr('y1', d => d.source.y)
+                    .attr('x2', d => d.target.x)
+                    .attr('y2', d => d.target.y);
+
+                // Update nodes
+                hostNodes.attr('transform', d => `translate(${d.x},${d.y})`);
+                switchNodes.attr('transform', d => `translate(${d.x},${d.y})`);
+            });
+        }
+
+        // Drag functions
+        function dragStarted(event, d) {
+            if (!event.active) topoSimulation.alphaTarget(0.3).restart();
+            d.fx = d.x;
+            d.fy = d.y;
+        }
+
+        function dragged(event, d) {
+            d.fx = event.x;
+            d.fy = event.y;
+        }
+
+        function dragEnded(event, d) {
+            if (!event.active) topoSimulation.alphaTarget(0);
+            // Keep position fixed after drag
+        }
+
+        // Tooltip functions
+        function showHostTooltip(event, d) {
+            const tooltip = document.getElementById('topo-tooltip');
+            tooltip.innerHTML = `
+                <div class="tooltip-title">🖥️ ${d.label}</div>
+                <div class="tooltip-row"><span class="tooltip-label">Management IP:</span><span class="tooltip-value">${d.ip}</span></div>
+                <div class="tooltip-row"><span class="tooltip-label">VXLAN IP:</span><span class="tooltip-value">${d.vxlanIp}</span></div>
+                <div class="tooltip-row"><span class="tooltip-label">Type:</span><span class="tooltip-value">${d.data.type || 'remote'}</span></div>
+            `;
+            positionTooltip(event, tooltip);
+        }
+
+        function showSwitchTooltip(event, d) {
+            const tooltip = document.getElementById('topo-tooltip');
+            tooltip.innerHTML = `
+                <div class="tooltip-title">🔌 ${d.label}</div>
+                <div class="tooltip-row"><span class="tooltip-label">Host:</span><span class="tooltip-value">${d.hostname}</span></div>
+                <div class="tooltip-row"><span class="tooltip-label">DPID:</span><span class="tooltip-value">${d.dpid}</span></div>
+                <div class="tooltip-row"><span class="tooltip-label">Ports:</span><span class="tooltip-value">${d.ports}</span></div>
+            `;
+            positionTooltip(event, tooltip);
+        }
+
+        function showTunnelTooltip(event, d) {
+            const tooltip = document.getElementById('topo-tooltip');
+            const color = getVNIColor(d.vni);
+            tooltip.innerHTML = `
+                <div class="tooltip-title" style="border-bottom-color: ${color.start};">🔗 VXLAN Tunnel</div>
+                <div class="tooltip-row"><span class="tooltip-label">VNI:</span><span class="tooltip-value" style="color: ${color.start};">${d.vni}</span></div>
+                <div class="tooltip-row"><span class="tooltip-label">Source:</span><span class="tooltip-value">${d.srcIp}</span></div>
+                <div class="tooltip-row"><span class="tooltip-label">Destination:</span><span class="tooltip-value">${d.dstIp}</span></div>
+                <div class="tooltip-row"><span class="tooltip-label">Status:</span><span class="tooltip-value" style="color: #2ecc71;">● ${d.status}</span></div>
+            `;
+            positionTooltip(event, tooltip);
+        }
+
+        function positionTooltip(event, tooltip) {
+            const container = document.getElementById('topology-container');
+            const rect = container.getBoundingClientRect();
+            let x = event.clientX - rect.left + 15;
+            let y = event.clientY - rect.top + 15;
+
+            // Keep tooltip in bounds
+            if (x + 200 > rect.width) x = x - 220;
+            if (y + 100 > rect.height) y = y - 120;
+
+            tooltip.style.left = x + 'px';
+            tooltip.style.top = y + 'px';
+            tooltip.classList.add('visible');
+        }
+
+        function hideTooltip() {
+            document.getElementById('topo-tooltip').classList.remove('visible');
+        }
+
+        // Update legend with VNI colors
+        function updateLegendVnis(vnis) {
+            const legend = document.getElementById('topology-legend');
+            let html = `
+                <div class="legend-title">Legend</div>
+                <div class="legend-items">
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: linear-gradient(135deg, #667eea, #764ba2);"></div>
+                        <span>Host</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #3498db; border-radius: 50%;"></div>
+                        <span>Switch</span>
+                    </div>
+            `;
+
+            // Add VNI colors (limit to 5 for space)
+            const displayVnis = vnis.slice(0, 5);
+            displayVnis.forEach(vni => {
+                const color = getVNIColor(vni);
+                html += `
+                    <div class="legend-item">
+                        <div class="legend-line" style="background: linear-gradient(90deg, ${color.start}, ${color.end});"></div>
+                        <span>VNI ${vni}</span>
+                    </div>
+                `;
+            });
+
+            if (vnis.length > 5) {
+                html += `<div class="legend-item"><span>+${vnis.length - 5} more</span></div>`;
+            }
+
+            html += '</div>';
+            legend.innerHTML = html;
+        }
+
+        // Update stats
+        function updateTopologyStats() {
+            document.getElementById('topo-hosts').textContent = topoHosts.length;
+            document.getElementById('topo-switches').textContent = topoSwitches.length;
+            document.getElementById('topo-tunnels').textContent = topoTunnels.length;
+
+            const uniqueVnis = [...new Set(topoTunnels.map(t => t.vni))];
+            document.getElementById('topo-vnis').textContent = uniqueVnis.length;
+        }
+
+        // Control functions
+        function toggleAnimation() {
+            topoAnimated = !topoAnimated;
+            const btn = document.getElementById('btn-animate');
+            btn.textContent = topoAnimated ? '⏸️ Pause' : '▶️ Play';
+
+            topoSvg.selectAll('.tunnel-link')
+                .classed('tunnel-animated', topoAnimated);
+        }
+
+        function setTopologyView(view) {
+            topoCurrentView = view;
+            document.querySelectorAll('.topology-controls .topo-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById('view-all').classList.add('active');
+            // Future: Filter by VNI
+        }
+
+        function resetTopology() {
+            // Release all fixed positions
+            topoData.nodes.forEach(n => {
+                n.fx = null;
+                n.fy = null;
+            });
+            topoSimulation.alpha(1).restart();
+        }
+
+        function toggleFullscreen() {
+            const container = document.getElementById('topology-container');
+            if (container.style.height === '800px') {
+                container.style.height = '';
+                document.getElementById('topology-svg').setAttribute('height', '500');
+            } else {
+                container.style.height = '800px';
+                document.getElementById('topology-svg').setAttribute('height', '800');
+            }
+            if (topoSimulation) {
+                topoSimulation.force('center', d3.forceCenter(
+                    container.clientWidth / 2,
+                    parseInt(document.getElementById('topology-svg').getAttribute('height')) / 2
+                ));
+                topoSimulation.alpha(0.5).restart();
+            }
+        }
+
+        // Refresh topology with latest data
+        function refreshTopology() {
+            loadTopologyData();
+        }
+
+        // Initialize topology when page loads
+        setTimeout(initTopology, 1500);
+
+        // Refresh topology when data refreshes
+        const originalLoadData = loadData;
+        loadData = function() {
+            originalLoadData();
+            setTimeout(refreshTopology, 500);
+        };
+
+        // ============ END TOPOLOGY VISUALIZATION ============
     </script>
 </body>
 </html>
