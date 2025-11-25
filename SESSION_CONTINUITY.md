@@ -1,8 +1,8 @@
 # Recira VXLAN Web Controller - Session Continuity Document
 
 **Date**: 2025-11-25
-**Version**: v0.7.4 - Storage & API Fixes
-**Status**: Hosts re-added, networks created, ready for DHCP testing
+**Version**: v0.7.5 - DHCP Cross-Host Fix
+**Status**: DHCP working across all hosts, hosts cleaned up
 **GitHub**: https://github.com/bufanoc/recira
 
 ---
@@ -68,12 +68,30 @@
 
 ## Current Session Status (Nov 25)
 
-**Last Updated**: 2025-11-25 ~14:15 UTC
+**Last Updated**: 2025-11-25 ~20:00 UTC
 
-### What Was Done:
+### What Was Done (Latest Session):
+
+1. **Cleaned up all 3 hosts** - Removed leftover OVS ports and routes from previous experiments
+   - ovs-01: Removed vxlan100, vxlan101, dhcp-test, old IPs/routes
+   - ovs-02: Removed vxlan100, vxlan101, vxlan1001, vxlan1009, vxlan2000
+   - ovs-3: Removed vxlan1001, vxlan1004_217, vxlan1009, vxlan2000
+
+2. **Fixed DHCP VLAN tag bug** (commit 57b4f51)
+   - Gateway port was incorrectly tagged with VLAN matching VNI
+   - This prevented DHCP from working across VXLAN tunnels
+   - VXLAN uses VNI for encapsulation - VLAN tags in bridge broke traffic flow
+   - Now gateway ports are untagged; existing configs auto-fixed
+
+3. **Verified DHCP working** across all hosts
+   - ovs-02 got 10.0.0.127 from DHCP server on ovs-01
+   - ovs-3 got 10.0.0.109 from DHCP server on ovs-01
+
+4. **Verified underlay connectivity** - 0% packet loss between all hosts
+
+### Previous Session Work:
 
 1. **Fixed dhcp_manager.py Gateway Port Tagging** (commit 1a8fed5)
-   - Gateway port now properly tagged with VNI for overlay isolation
 
 2. **Fixed VXLAN Tunnel Deletion Bug** (commit dc8ce30)
    - Was using `switch_id` instead of `host_id` to find hosts
@@ -88,12 +106,11 @@
 5. **Moved storage to permanent location** (commit a98ecbf)
    - Changed from `/tmp/` to `/var/lib/recira/`
 
-6. **User re-provisioned all 3 hosts** with correct dual-interface config
-
 ### Current State:
 - 4 hosts loaded (3 remote + localhost)
-- 17 tunnels discovered
-- VXLAN IPs correctly displayed in UI
+- Network "devs" (VNI 1005) with full-mesh tunnels
+- DHCP working on ovs-01 serving 10.0.0.100-150
+- Underlay network (10.172.88.0/24) fully operational
 
 ---
 
@@ -225,17 +242,13 @@ dhcp-test cleanup      # Remove test interface
 
 ## Pending Tasks
 
-1. **Test DHCP on Virtual Network**
-   ```bash
-   ssh root@192.168.88.195 'dhcp-test test <VNI>'
-   ```
+1. **Continue with v0.8 Port Management**
+   - VM port attachment to overlay networks
+   - Port tagging for VMs
 
-2. **Verify Underlay Connectivity**
-   ```bash
-   ssh root@192.168.88.195 'ping -c 3 10.172.88.232'
-   ```
-
-3. **Continue with v0.8 Port Management**
+2. **Consider updating dhcp-test script**
+   - Currently uses VLAN tags which may not work
+   - Should create untagged test ports instead
 
 ---
 
@@ -254,6 +267,7 @@ dhcp-test cleanup      # Remove test interface
 | v0.7.2 | Nov 25 | D3.js visual topology |
 | v0.7.3 | Nov 25 | Host management, bug fixes |
 | v0.7.4 | Nov 25 | Storage location, API fixes |
+| v0.7.5 | Nov 25 | DHCP cross-host fix, host cleanup |
 
 ---
 
@@ -261,7 +275,7 @@ dhcp-test cleanup      # Remove test interface
 
 | Version | Feature | Status |
 |---------|---------|--------|
-| v0.7.4 | Storage & API Fixes | **Current** |
+| v0.7.5 | DHCP Cross-Host Fix | **Current** |
 | v0.8 | Port Management | Next |
 | v1.0 | OpenFlow | Planned |
 | v1.1 | Monitoring | Planned |
@@ -298,6 +312,8 @@ ping -c 4 10.172.88.232
 
 | Commit | Description |
 |--------|-------------|
+| 57b4f51 | Fix DHCP not working across VXLAN tunnels (remove VLAN tags) |
+| 4f29ab8 | Merge session continuity documents |
 | a98ecbf | Move storage from /tmp to /var/lib/recira |
 | 568018d | Fix vxlan_ip missing in /api/hosts response |
 | dc8ce30 | Add host management, fix tunnel deletion |
@@ -306,4 +322,4 @@ ping -c 4 10.172.88.232
 ---
 
 *End of Session Continuity Document*
-*Last updated: 2025-11-25 ~14:20 UTC*
+*Last updated: 2025-11-25 ~20:00 UTC*
