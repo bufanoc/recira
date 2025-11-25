@@ -103,9 +103,20 @@
 - Live statistics display
 - Tunnel discovery on startup (survives restarts)
 
+### v0.7.3 - Host Management + Bug Fixes (Nov 25, 2025)
+**Host lifecycle management and critical fixes**
+
+- Host Detach: Remove from active management, preserve data for re-attach
+- Host Forget: Permanently delete all host data
+- Host Re-attach: Reconnect previously detached hosts
+- New Managed Hosts table with full details and actions
+- Detached Hosts section for pending re-attachment
+- Fixed VXLAN tunnel deletion (was using switch_id as host_id)
+- Fixed DHCP gateway port VNI tagging
+
 ---
 
-## Current Version: v0.7.2
+## Current Version: v0.7.3
 
 **Status**: Fully Functional
 **Server**: http://192.168.88.164:8080
@@ -268,6 +279,7 @@ Each version is complete when:
 | v0.7.0 | DHCP Integration | Complete |
 | v0.7.1 | Host Persistence | Complete |
 | v0.7.2 | Visual Topology | Complete |
+| v0.7.3 | Host Management | Complete |
 | v0.8 | Port Management | **Next** |
 | v1.0 | OpenFlow | Planned |
 | v1.1 | Monitoring | Planned |
@@ -278,5 +290,5 @@ Each version is complete when:
 ---
 
 **Last Updated:** 2025-11-25
-**Current Version:** v0.7.2
+**Current Version:** v0.7.3
 **Next Milestone:** v0.8 (Port Management)

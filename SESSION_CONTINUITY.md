@@ -1,7 +1,7 @@
 # Recira VXLAN Web Controller - Session Continuity Document
 
 **Date**: 2025-11-25
-**Version**: v0.7.2 - Visual Topology + Tunnel Discovery
+**Version**: v0.7.3 - Host Management + Bug Fixes
 **Status**: Troubleshooting DHCP / Underlay Network
 
 ---
@@ -96,6 +96,19 @@
    - Added `vni` parameter to `_create_gateway_port` method
    - Gateway port now properly tagged with VNI for overlay isolation
    - Fix works for both new and existing ports
+
+7. **Fixed VXLAN Tunnel Deletion Bug** (commit dc8ce30):
+   - Was using `switch_id` instead of `host_id` to find hosts
+   - Added `_get_switch_by_id()` and `_get_host_for_switch()` helper methods
+   - Tunnel deletion now works correctly
+
+8. **Added Host Management (v0.7.3)** (commit dc8ce30):
+   - **Detach Host**: Remove from active management but keep data for later re-attach
+   - **Forget Host**: Permanently delete all host data
+   - **Re-attach Host**: Reconnect a previously detached host
+   - New Managed Hosts table showing all hosts with management actions
+   - Detached Hosts section shows hosts that can be re-attached
+   - API: `/api/hosts/remove`, `/api/hosts/reattach`, `/api/hosts/detached`
 
 ### Current Network State:
 
@@ -214,6 +227,7 @@ https://github.com/bufanoc/recira
 | Version | Feature | Status |
 |---------|---------|--------|
 | v0.7.2 | Visual Topology | Complete |
+| v0.7.3 | Host Management + Bug Fixes | Complete |
 | v0.8 | Port Management | Next |
 | v1.0 | OpenFlow | Planned |
 | v1.1 | Monitoring | Planned |
