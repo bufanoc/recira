@@ -1,6 +1,8 @@
-# VXLAN Web Controller - Development Roadmap
+# Recira - Development Roadmap
 
 **Vision:** Build a complete, production-ready SDN platform for managing VXLAN overlay networks across multiple Linux hosts.
+
+*Reviving Nicira's vision for open networking*
 
 **Approach:** Progressive development - each phase builds logically on the previous, avoiding "cart before horse" scenarios.
 

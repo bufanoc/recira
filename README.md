@@ -1,8 +1,10 @@
-# VXLAN Web Controller
+# Recira
 
 **Open Source SDN Platform for VXLAN Overlay Networks**
 
-Build and manage virtual overlay networks across multiple Linux hosts with a professional web interface. Repurposed from Citrix DVSC to work with any Open vSwitch deployment.
+*Reviving Nicira's vision for open networking*
+
+Build and manage virtual overlay networks across multiple Linux hosts with a professional web interface. Recira repurposes the Citrix DVSC web UI to work with any Open vSwitch deployment.
 
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.6+-green.svg)](https://python.org)
@@ -28,8 +30,8 @@ Build and manage virtual overlay networks across multiple Linux hosts with a pro
 ### Installation
 
 ```bash
-git clone https://github.com/yourusername/vxlan-web-controller.git
-cd vxlan-web-controller
+git clone https://github.com/bufanoc/recira.git
+cd recira
 python3 backend/server.py
 ```
 
@@ -92,7 +94,7 @@ curl -X POST http://localhost:8080/api/tunnels/create \
 ## Project Structure
 
 ```
-vxlan-web-controller/
+recira/
 ├── backend/
 │   ├── server.py              # Main HTTP server & API router
 │   ├── ovs_manager.py         # OVS discovery & management
@@ -265,12 +267,30 @@ python3 backend/server.py
 - Check VXLAN endpoint IPs are reachable
 - Ensure VNI matches on both ends
 
+## Attribution
+
+Recira repurposes the web UI components from **Citrix DVSC** (Distributed Virtual Switch Controller), originally developed by **Nicira Networks** (acquired by VMware, now part of Broadcom).
+
+### Original Work
+- **DVSC Web UI**: Copyright (C) Citrix Systems, Inc. / Nicira Networks
+- **Original Authors**: Nicira engineering team
+- **Technology**: Dojo Toolkit 1.8, NOX Controller framework
+
+### This Project
+- **Backend Controller**: Copyright (C) 2025 Recira Contributors (Original work)
+- **Repurposed UI**: Used for educational and open-source purposes
+- **License**: Apache 2.0
+
+The web UI components (`frontend/37734/`) are extracted from an end-of-life product and repurposed for modern open-source SDN management. This project honors Nicira's pioneering work in software-defined networking.
+
+**Note**: If you represent Citrix, Broadcom, or VMware and have concerns about this use, please open an issue to discuss.
+
 ## License
 
 Apache License 2.0
 
-Original DVSC UI components: Copyright (C) Citrix Systems/Nicira
-Repurposed controller: Copyright (C) 2025 VXLAN Web Controller Contributors
+**Recira Backend & Modifications**: Copyright (C) 2025 Recira Contributors
+**Original DVSC UI Components**: Copyright (C) Citrix Systems, Inc.
 
 ## Acknowledgments
 
@@ -281,8 +301,8 @@ Repurposed controller: Copyright (C) 2025 VXLAN Web Controller Contributors
 
 ---
 
-**Built by:** Carmine + Claude Code
+**Built by:** Carmine Bufano (bufanoc) + Claude Code
 **Started:** 2025-11-24
 **Status:** v0.4 - Interactive Management Complete!
 **Website:** (Coming soon)
-**GitHub:** https://github.com/yourusername/vxlan-web-controller
+**GitHub:** https://github.com/bufanoc/recira
