@@ -1,7 +1,7 @@
 # Recira Installation Guide
 
-**Version:** 0.6.1
-**Last Updated:** 2025-11-25
+**Version:** 0.7.7
+**Last Updated:** 2025-12-04
 
 This guide provides step-by-step instructions for installing and configuring Recira.
 
@@ -10,12 +10,14 @@ This guide provides step-by-step instructions for installing and configuring Rec
 ## Table of Contents
 
 1. [System Requirements](#system-requirements)
-2. [Quick Install (One-Line)](#quick-install-one-line)
+2. [Quick Install](#quick-install)
 3. [Manual Installation](#manual-installation)
 4. [Post-Installation Setup](#post-installation-setup)
 5. [Multi-Host Setup](#multi-host-setup)
-6. [Verification](#verification)
-7. [Troubleshooting](#troubleshooting)
+6. [Managing the Service](#managing-the-service)
+7. [Upgrading](#upgrading)
+8. [Uninstalling](#uninstalling)
+9. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -25,13 +27,12 @@ This guide provides step-by-step instructions for installing and configuring Rec
 
 **Operating System:**
 - Ubuntu 20.04+ / Debian 11+
-- CentOS 7+ / RHEL 7+
-- Any Linux with Python 3.6+
+- CentOS 7+ / RHEL 7+ / Rocky / AlmaLinux
+- Fedora
+- Any Linux with Python 3.6+ and systemd
 
-**Software:**
+**Software (auto-installed):**
 - Python 3.6 or higher
-- Git
-- SSH client
 - `sshpass` (for remote host management)
 
 **Network:**
@@ -64,32 +65,53 @@ This guide provides step-by-step instructions for installing and configuring Rec
 
 ---
 
-## Quick Install (One-Line)
+## Quick Install
 
-**Coming in v0.7!**
+The recommended way to install Recira is using the install script:
 
 ```bash
-# Future one-line installer (not yet available)
-curl -sSL https://raw.githubusercontent.com/bufanoc/recira/master/install.sh | bash
+# Clone the repository
+git clone https://github.com/bufanoc/recira.git
+cd recira
+
+# Run the installer (requires root)
+sudo ./install.sh
 ```
 
-For now, use the [Manual Installation](#manual-installation) method below.
+The installer will:
+- Detect your OS (Ubuntu/Debian/CentOS/RHEL/Fedora)
+- Install required dependencies (python3, sshpass)
+- Create the data directory (`/var/lib/recira/`)
+- Install Recira to `/opt/recira/`
+- Create and enable a systemd service
+- Start the Recira service
+
+After installation, access the web UI at: **http://YOUR_IP:8080**
+
+### Check Installation Status
+
+```bash
+./install.sh --status
+```
 
 ---
 
 ## Manual Installation
+
+If you prefer to install manually or the installer doesn't work for your system:
 
 ### Step 1: Install Prerequisites
 
 **Ubuntu/Debian:**
 ```bash
 sudo apt-get update
-sudo apt-get install -y git python3 python3-pip sshpass
+sudo apt-get install -y git python3 sshpass
 ```
 
 **CentOS/RHEL:**
 ```bash
-sudo yum install -y git python3 python3-pip sshpass epel-release
+sudo yum install -y epel-release
+sudo yum install -y git python3 sshpass
 ```
 
 ### Step 2: Clone Repository
@@ -99,14 +121,11 @@ git clone https://github.com/bufanoc/recira.git
 cd recira
 ```
 
-### Step 3: Verify Installation
+### Step 3: Create Data Directory
 
 ```bash
-# Check Python version (must be 3.6+)
-python3 --version
-
-# Verify repository structure
-ls -la backend/ frontend/
+sudo mkdir -p /var/lib/recira
+sudo chmod 750 /var/lib/recira
 ```
 
 ### Step 4: Start Recira Server
@@ -116,7 +135,7 @@ ls -la backend/ frontend/
 python3 backend/server.py
 
 # Or run in background
-nohup python3 backend/server.py > /tmp/recira.log 2>&1 &
+nohup python3 backend/server.py > /var/log/recira.log 2>&1 &
 ```
 
 ### Step 5: Access Web Interface
@@ -284,6 +303,85 @@ ssh root@<HOST_IP> 'ovs-vsctl list Interface | grep -A 10 vxlan'
 
 ---
 
+## Managing the Service
+
+When installed via `install.sh`, Recira runs as a systemd service.
+
+### Service Commands
+
+```bash
+# Check service status
+sudo systemctl status recira
+
+# Start the service
+sudo systemctl start recira
+
+# Stop the service
+sudo systemctl stop recira
+
+# Restart the service
+sudo systemctl restart recira
+
+# View logs (live)
+sudo journalctl -u recira -f
+
+# View recent logs
+sudo journalctl -u recira --since "1 hour ago"
+```
+
+### Enable/Disable Auto-Start
+
+```bash
+# Enable auto-start on boot (default)
+sudo systemctl enable recira
+
+# Disable auto-start
+sudo systemctl disable recira
+```
+
+---
+
+## Upgrading
+
+To upgrade an existing installation:
+
+```bash
+# Navigate to the repository
+cd /path/to/recira
+
+# Pull latest changes
+git pull
+
+# Run upgrade
+sudo ./install.sh --upgrade
+```
+
+The upgrade process will:
+- Stop the running service
+- Back up your data directory to `/tmp/recira-backup-*`
+- Install the new files
+- Restart the service
+
+Your hosts, networks, and DHCP configurations are preserved.
+
+---
+
+## Uninstalling
+
+To completely remove Recira:
+
+```bash
+sudo ./install.sh --uninstall
+```
+
+This will:
+- Stop and disable the service
+- Remove the systemd service file
+- Remove `/opt/recira/`
+- Optionally remove `/var/lib/recira/` (you'll be asked)
+
+---
+
 ## Troubleshooting
 
 ### Server Won't Start
@@ -293,8 +391,8 @@ ssh root@<HOST_IP> 'ovs-vsctl list Interface | grep -A 10 vxlan'
 # Find and kill process
 lsof -ti:8080 | xargs kill -9
 
-# Restart server
-python3 backend/server.py
+# Restart service
+sudo systemctl restart recira
 ```
 
 ### Can't SSH to Remote Hosts
@@ -385,11 +483,10 @@ curl http://localhost:8080/api/networks
 
 ### Hosts Disappear After Server Restart
 
-**Known Limitation (v0.6.1):**
-- Remote hosts are stored in memory only
-- After server restart, re-add hosts via UI
-- Networks and tunnels ARE persisted
-- **Fix coming in v0.7**: Host persistence to disk
+**Fixed in v0.7.1+:**
+- Hosts are now persisted to `/var/lib/recira/hosts.json`
+- Hosts automatically reconnect on server restart
+- If hosts still disappear, check file permissions on the data directory
 
 ---
 

@@ -46,20 +46,32 @@ Build and manage virtual overlay networks across multiple Linux hosts with a pro
 
 ### Prerequisites
 
-- Python 3.6+
-- Linux hosts with Open vSwitch 2.x
-- SSH access to managed hosts
-- `sshpass` for remote host management
+- Linux with Python 3.6+ and systemd
+- SSH access to managed OVS hosts
 
 ### Installation
 
 ```bash
 git clone https://github.com/bufanoc/recira.git
 cd recira
-python3 backend/server.py
+sudo ./install.sh
 ```
 
-Open browser to: **http://localhost:8080**
+The installer will:
+- Install dependencies (python3, sshpass)
+- Set up Recira as a systemd service
+- Start the service automatically
+
+Open browser to: **http://YOUR_IP:8080**
+
+### Service Management
+
+```bash
+sudo systemctl status recira    # Check status
+sudo systemctl restart recira   # Restart
+sudo journalctl -u recira -f    # View logs
+./install.sh --status           # Check installation
+```
 
 ### Add Remote Hosts
 
